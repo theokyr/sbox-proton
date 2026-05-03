@@ -1,3 +1,94 @@
+# sbox-proton
+
+This fork carries experimental Linux/Proton support for building and running the Windows s&box editor from a Linux checkout. It keeps Facepunch's upstream source intact while adding path normalization, a Proton-targeted build pipeline, deployment helpers, fallback fonts, runtime compiler references, and Hammer/cloud asset fixes needed by the editor under Proton.
+
+The intended workflow is:
+
+1. Keep `upstream` pointed at Facepunch's repository.
+2. Build Windows-managed artifacts on Linux with the local .NET SDK.
+3. Reuse the native Windows artifacts downloaded by the build pipeline.
+4. Deploy only the changed editor/runtime artifacts into the Steam s&box install.
+5. Launch through Steam/Proton so Steam API, workshop/package auth, and the editor context are correct.
+
+## Proton Fork Requirements
+
+This workflow has been tested on Linux with Steam and Proton. You need:
+
+* Steam with s&box installed and validated.
+* A Proton compatibility tool for the s&box editor app.
+* .NET 10 SDK on the Linux host.
+* Windows .NET Desktop Runtime installed in the editor Wine prefix.
+* `rsync`.
+* `git`.
+* Fallback fonts for editor icons/emoji, such as `NotoColorEmoji` and Material Symbols or Material Icons.
+
+The scripts default to a persistent .NET CLI home under your user directory so the build does not depend on Wine's `Z:/.local` path behavior.
+
+## Proton Prefix .NET Runtime Setup
+
+The Linux host SDK is used for building, but the editor process itself runs inside Steam's Proton prefix and needs the Windows .NET Desktop Runtime there too. The editor may ask to install .NET, but under Proton it will not reliably install it for you.
+
+Install the Windows x64 .NET 10 Desktop Runtime into the editor prefix. This fork has been tested with editor app id `2129370`; adjust the app id if your Steam install uses a different one.
+
+Using `protontricks`:
+
+```bash
+protontricks 2129370 --gui
+```
+
+Then run the downloaded Windows Desktop Runtime installer from the protontricks file picker.
+
+Or run the installer directly with Wine against the Steam compatdata prefix:
+
+```bash
+export STEAM_COMPAT_DATA_PATH="$HOME/.local/share/Steam/steamapps/compatdata/2129370"
+WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx" wine "$HOME/Downloads/windowsdesktop-runtime-10.0.0-win-x64.exe"
+```
+
+You can verify the prefix contains the runtime with:
+
+```bash
+WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx" wine dotnet --list-runtimes
+```
+
+The output should include `Microsoft.WindowsDesktop.App 10.0.x`.
+
+## Proton Fork Usage
+
+Build and deploy to the detected Steam s&box install:
+
+```bash
+./build-and-deploy.sh --apply
+```
+
+Force a fresh download of public/native artifacts:
+
+```bash
+./build-and-deploy.sh --refresh-artifacts --apply
+```
+
+Preview deployment without copying files:
+
+```bash
+scripts/deploy-proton-build.sh
+```
+
+Deploy only, after a build has already produced artifacts:
+
+```bash
+scripts/deploy-proton-build.sh --apply
+```
+
+If Steam is installed somewhere nonstandard, pass an explicit destination:
+
+```bash
+./build-and-deploy.sh --apply --dest "$HOME/.local/share/Steam/steamapps/common/sbox"
+```
+
+The deploy script stages .NET reference assemblies for the in-editor compiler and copies discovered fallback fonts into `game/fonts/proton`. Hammer cloud materials are staged into each project's generated library at `Libraries/CloudAssets/Assets` so native Source 2 resource loading can resolve package material and texture paths under Proton.
+
+## Upstream README
+
 <div align="center">
   <img src="https://sbox.game/img/sbox-logo-square.svg" width="80px" alt="s&box logo">
 
