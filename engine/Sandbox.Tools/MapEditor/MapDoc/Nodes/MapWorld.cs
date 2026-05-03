@@ -46,18 +46,16 @@ public sealed class MapWorld : MapNode
 	{
 		// actual file might not exist yet, so we can't just search the asset database
 
-		fullPath = fullPath.Replace( '/', '\\' );
+		fullPath = HostPath.Normalize( fullPath );
 
 		foreach ( var proj in Project.All.Where( x => x.Active ) )
 		{
 			if ( !proj.Active ) continue;
 			if ( !proj.HasAssetsPath() ) continue;
 
-			var assetsPath = $"{proj.GetAssetsPath()}\\";
-
-			if ( fullPath.StartsWith( assetsPath, StringComparison.OrdinalIgnoreCase ) )
+			if ( HostPath.TryGetRelativeWithinRoot( proj.GetAssetsPath(), fullPath, out var relativePath ) )
 			{
-				return fullPath[assetsPath.Length..].NormalizeFilename( false, false );
+				return relativePath.NormalizeFilename( false, false );
 			}
 		}
 

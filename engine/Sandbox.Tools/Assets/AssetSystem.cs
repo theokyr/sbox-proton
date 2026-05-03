@@ -74,10 +74,40 @@ public static partial class AssetSystem
 		if ( string.IsNullOrWhiteSpace( asset.Path ) )
 			return;
 
-		assetsByPath[asset.Path] = asset;
-		assetsByPath[asset.AbsolutePath] = asset;
-		assetsByPath[asset.RelativePath] = asset;
-		assetsByPath[asset.AbsoluteCompiledPath] = asset;
+		AddPathLookup( asset.Path, asset );
+		AddPathLookup( asset.AbsolutePath, asset );
+		AddPathLookup( asset.RelativePath, asset );
+		AddPathLookup( asset.AbsoluteCompiledPath, asset );
+	}
+
+	static void AddPathLookup( string path, Asset asset )
+	{
+		if ( string.IsNullOrWhiteSpace( path ) )
+			return;
+
+		assetsByPath[path] = asset;
+
+		var normalized = HostPath.Normalize( path );
+		assetsByPath[normalized] = asset;
+
+		if ( normalized.Length > 0 && normalized[0] == '/' )
+			assetsByPath[normalized.TrimStart( '/' )] = asset;
+	}
+
+	static bool TryFindByNormalizedPath( string path, out Asset asset )
+	{
+		asset = null;
+
+		if ( string.IsNullOrWhiteSpace( path ) )
+			return false;
+
+		if ( assetsByPath.TryGetValue( path, out asset ) && !asset.IsDeleted )
+			return true;
+
+		if ( path.Length > 0 && path[0] == '/' && assetsByPath.TryGetValue( path.TrimStart( '/' ), out asset ) && !asset.IsDeleted )
+			return true;
+
+		return false;
 	}
 
 
@@ -94,16 +124,30 @@ public static partial class AssetSystem
 
 		log.Trace( $"Removed: {a}" );
 
-		if ( a.Path is not null ) assetsByPath.TryRemove( a.Path, out _ );
-		if ( a.AbsolutePath is not null ) assetsByPath.TryRemove( a.AbsolutePath, out _ );
-		if ( a.RelativePath is not null ) assetsByPath.TryRemove( a.RelativePath, out _ );
-		if ( a.AbsoluteCompiledPath is not null ) assetsByPath.TryRemove( a.AbsoluteCompiledPath, out _ );
+			RemovePathLookup( a.Path );
+			RemovePathLookup( a.AbsolutePath );
+			RemovePathLookup( a.RelativePath );
+			RemovePathLookup( a.AbsoluteCompiledPath );
 
 		// Can it ever come back??
 		UpdateQueue.Remove( a );
 		allAssets.Remove( index );
 		a.OnRemoved();
 
+	}
+
+	static void RemovePathLookup( string path )
+	{
+		if ( string.IsNullOrWhiteSpace( path ) )
+			return;
+
+		assetsByPath.TryRemove( path, out _ );
+
+		var normalized = HostPath.Normalize( path );
+		assetsByPath.TryRemove( normalized, out _ );
+
+		if ( normalized.Length > 0 && normalized[0] == '/' )
+			assetsByPath.TryRemove( normalized.TrimStart( '/' ), out _ );
 	}
 
 	internal static void RecordAssetOpen( uint index )
@@ -198,13 +242,12 @@ public static partial class AssetSystem
 		if ( string.IsNullOrWhiteSpace( path ) )
 			return null;
 
-		path = path.Replace( '\\', '/' );
-		path = path.TrimStart( '/' );
+			var normalized = HostPath.Normalize( path );
 
-		if ( assetsByPath.TryGetValue( path, out var asset ) && !asset.IsDeleted )
-		{
-			return asset;
-		}
+			if ( TryFindByNormalizedPath( normalized, out var asset ) )
+			{
+				return asset;
+			}
 
 		return null;
 	}
@@ -523,4 +566,3 @@ public static partial class AssetSystem
 		return new EmbeddedAsset( target );
 	}
 }
-

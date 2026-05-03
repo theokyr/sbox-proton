@@ -258,7 +258,7 @@ public partial class Project
 		if ( !path.EndsWith( ".sbproj" ) )
 			path = System.IO.Path.Combine( path, ".sbproj" );
 
-		var cleanPath = System.IO.Path.GetFullPath( path );
+			var cleanPath = HostPath.GetFullPath( path );
 
 		// Don't add the same project twice
 		if ( All.Where( a => a.ConfigFilePath == cleanPath ).FirstOrDefault() is Project lp )
@@ -312,7 +312,7 @@ public partial class Project
 
 	public static Project Load( string dir )
 	{
-		var cleanPath = System.IO.Path.GetFullPath( dir );
+			var cleanPath = HostPath.GetFullPath( dir );
 
 		var project = new Project { ConfigFilePath = cleanPath, Active = false };
 		project.Load();
@@ -341,4 +341,3 @@ public partial class Project
 		return CompileGroup.FindCompilerByAssemblyName( assembly.GetName().Name );
 	}
 }
-

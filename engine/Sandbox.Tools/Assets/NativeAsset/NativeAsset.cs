@@ -22,9 +22,9 @@ internal class NativeAsset : Asset
 		Name = native.GetFriendlyName_Transient().NormalizeFilename( false );
 		RelativePath = native.GetRelativePath_Transient( AssetLocation_t.Invalid ).NormalizeFilename( false );
 		Path = System.IO.Path.ChangeExtension( RelativePath, AssetType.FileExtension ).NormalizeFilename( false );
-		AbsolutePath = native.GetAbsolutePath_Transient( AssetLocation_t.Invalid ).NormalizeFilename( false ); // invalid means get any
-		AbsoluteSourcePath = native.GetAbsolutePath_Transient( AssetLocation_t.Content ).NormalizeFilename( false ); // invalid means get any
-		AbsoluteCompiledPath = native.GetAbsolutePath_Transient( AssetLocation_t.Game ).NormalizeFilename( false ); // invalid means get any
+		AbsolutePath = HostPath.Normalize( native.GetAbsolutePath_Transient( AssetLocation_t.Invalid ).NormalizeFilename( false ) ); // invalid means get any
+		AbsoluteSourcePath = HostPath.Normalize( native.GetAbsolutePath_Transient( AssetLocation_t.Content ).NormalizeFilename( false ) ); // invalid means get any
+		AbsoluteCompiledPath = HostPath.Normalize( native.GetAbsolutePath_Transient( AssetLocation_t.Game ).NormalizeFilename( false ) ); // invalid means get any
 		IsDeleted = string.IsNullOrEmpty( AbsolutePath );
 
 		if ( AssetSystem.CloudDirectory is not null )
@@ -71,7 +71,7 @@ internal class NativeAsset : Asset
 	public override string GetCompiledFile( bool absolute = false )
 	{
 		if ( absolute )
-			return native.GetAbsolutePath_Transient( AssetLocation_t.Game ).NormalizeFilename( false );
+			return HostPath.Normalize( native.GetAbsolutePath_Transient( AssetLocation_t.Game ).NormalizeFilename( false ) );
 
 		return native.GetRelativePath_Transient( AssetLocation_t.Game ).NormalizeFilename( false );
 	}
@@ -84,7 +84,7 @@ internal class NativeAsset : Asset
 	public override string GetSourceFile( bool absolute = false )
 	{
 		if ( absolute )
-			return native.GetAbsolutePath_Transient( AssetLocation_t.Content ).NormalizeFilename( false );
+			return HostPath.Normalize( native.GetAbsolutePath_Transient( AssetLocation_t.Content ).NormalizeFilename( false ) );
 
 		return native.GetRelativePath_Transient( AssetLocation_t.Content ).NormalizeFilename( false );
 	}

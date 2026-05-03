@@ -45,20 +45,6 @@
 
             </div>
 
-            <div class="tag-entry">
-
-                <div class="tagcolumn positive-tags">
-                    <label>What did you like?</label>
-                    <TagSelector Value:bind=@PositiveTags/>
-                </div>
-
-                <div class="tagcolumn negative-tags">
-                    <label>What did you dislike?</label>
-                    <TagSelector Value:bind=@NegativeTags />
-                </div>
-
-            </div>
-
             <UserComment Player="@Sandbox.Services.Players.Profile.Local">
                 <Content>
                     <TextEntry @ref=_textEntry Value:bind=@ReviewText Multiline="@true" Placeholder="Enter Your Review.."></TextEntry>

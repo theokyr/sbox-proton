@@ -50,7 +50,7 @@ static class StartupLoadProject
 		// Create the editor window - hidden
 		new EditorMainWindow();
 
-		var path = Sandbox.Utility.CommandLine.GetSwitch( "-project", "" ).TrimQuoted();
+		var path = HostPath.GetFullPath( Sandbox.Utility.CommandLine.GetSwitch( "-project", "" ).TrimQuoted() );
 
 		Step( "Opening Project" );
 
@@ -288,17 +288,21 @@ static class StartupLoadProject
 
 	static void UpdateProjectFilesystem( Project project )
 	{
-		var assetsPath = project.GetAssetsPath();
+		var assetsPath = HostPath.Normalize( project.GetAssetsPath() );
 		if ( !System.IO.Directory.Exists( assetsPath ) )
 			return;
 
-		NativeEngine.FullFileSystem.AddProjectPath( project.Config.FullIdent, project.GetAssetsPath() );
+		NativeEngine.FullFileSystem.AddProjectPath( project.Config.FullIdent, assetsPath );
 
-		var cloudFolder = System.IO.Path.Combine( project.GetRootPath(), ".sbox", "cloud" );
+		var cloudFolder = HostPath.Normalize( System.IO.Path.Combine( project.GetRootPath(), ".sbox", "cloud" ) );
 		NativeEngine.FullFileSystem.AddCloudPath( "mod_cloud", cloudFolder );
+		NativeEngine.EngineGlue.AddSearchPath( cloudFolder, "GAME", true );
+		NativeEngine.EngineGlue.AddSearchPath( HostPath.ToWinePath( cloudFolder ), "GAME", true );
 
-		var transientFolder = System.IO.Path.Combine( project.GetRootPath(), ".sbox", "transient" );
+		var transientFolder = HostPath.Normalize( System.IO.Path.Combine( project.GetRootPath(), ".sbox", "transient" ) );
 		NativeEngine.FullFileSystem.AddCloudPath( "mod_transient", transientFolder );
+		NativeEngine.EngineGlue.AddSearchPath( transientFolder, "GAME", true );
+		NativeEngine.EngineGlue.AddSearchPath( HostPath.ToWinePath( transientFolder ), "GAME", true );
 
 		//
 		// The engine ships a bunch of transient files, like image generations from the addon base, and
@@ -306,8 +310,10 @@ static class StartupLoadProject
 		//
 		if ( project.Config.Ident != "menu" )
 		{
-			var engineTransient = EngineFileSystem.Root.GetFullPath( "addons/menu/transients" );
+			var engineTransient = HostPath.Normalize( EngineFileSystem.Root.GetFullPath( "addons/menu/transients" ) );
 			NativeEngine.FullFileSystem.AddCloudPath( "mod_engtrans", engineTransient );
+			NativeEngine.EngineGlue.AddSearchPath( engineTransient, "GAME", false );
+			NativeEngine.EngineGlue.AddSearchPath( HostPath.ToWinePath( engineTransient ), "GAME", false );
 		}
 
 		Editor.FileSystem.RebuildContentPath();

@@ -22,7 +22,7 @@
 		<OutputType>winexe</OutputType>
 		<StartupObject>Sandbox.Program</StartupObject>
 		<DebugType>embedded</DebugType>
-		<ApplicationIcon>sbox-profiler.ico</ApplicationIcon>
+		<ApplicationIcon Condition="Exists('sbox-profiler.ico')">sbox-profiler.ico</ApplicationIcon>
 		<ProduceReferenceAssembly>false</ProduceReferenceAssembly>
 		<ReferenceOutputAssembly>false</ReferenceOutputAssembly>
 	</PropertyGroup>

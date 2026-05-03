@@ -24,7 +24,7 @@
 		<StartupObject>Sandbox.Program</StartupObject>
 		<ProduceReferenceAssembly>False</ProduceReferenceAssembly>
 		<DebugType>embedded</DebugType>
-		<ApplicationIcon>sbox.ico</ApplicationIcon>
+		<ApplicationIcon Condition="Exists('sbox.ico')">sbox.ico</ApplicationIcon>
 		<GenerateDependencyFile>false</GenerateDependencyFile>
 		<ReferenceOutputAssembly>false</ReferenceOutputAssembly>
 		<CETCompat>false</CETCompat>

@@ -216,4 +216,24 @@ public class StringExtensions
 		var result = input.NormalizeFilename( enforceInitialSlash, enforceLowerCase, separator );
 		Assert.AreEqual( expected, result );
 	}
-}
+
+	[DataTestMethod]
+	[DataRow( "/home/theo/project/.sbproj", false, "/home/theo/project/.sbproj" )]
+	[DataRow( "Z:\\home\\theo\\project\\.sbproj", true, "/home/theo/project/.sbproj" )]
+	[DataRow( "z:/home/theo/.local/share/sbox", true, "/home/theo/.local/share/sbox" )]
+	[DataRow( "C:\\Users\\steamuser\\Documents\\Game\\.sbproj", true, "C:/Users/steamuser/Documents/Game/.sbproj" )]
+	public void HostPath_Normalize( string input, bool convertWinePaths, string expected )
+	{
+		Assert.AreEqual( expected, HostPath.Normalize( input, convertWinePaths ) );
+	}
+
+	[TestMethod]
+	public void HostPath_TryGetRelativeWithinRoot()
+	{
+		Assert.IsTrue( HostPath.TryGetRelativeWithinRoot( "Z:\\home\\theo\\project\\Assets", "/home/theo/project/Assets/maps/test.vmap", out var relative, true ) );
+		Assert.AreEqual( "maps/test.vmap", relative );
+
+		Assert.IsFalse( HostPath.TryGetRelativeWithinRoot( "/home/theo/project/Assets", "/home/theo/other/Assets/test.vtex", out _, true ) );
+		Assert.IsFalse( HostPath.TryGetRelativeWithinRoot( "C:\\Project\\Assets", "Z:\\home\\theo\\project\\Assets\\maps\\test.vmap", out _, true ) );
+	}
+	}

@@ -122,7 +122,8 @@ public sealed partial class Project
 
 		try
 		{
-			RootDirectory = new DirectoryInfo( System.IO.Path.GetDirectoryName( ConfigFilePath ) );
+			ConfigFilePath = HostPath.GetFullPath( ConfigFilePath );
+			RootDirectory = new DirectoryInfo( HostPath.Normalize( System.IO.Path.GetDirectoryName( ConfigFilePath ) ) );
 			Assert.True( RootDirectory.Exists, $"{RootDirectory} does not exist" );
 
 			if ( !ConfigFilePath.EndsWith( ".sbproj" ) )
@@ -167,7 +168,7 @@ public sealed partial class Project
 	/// <summary>
 	/// Absolute path to the location of the <c>.sbproj</c> file of the project.
 	/// </summary>
-	public string GetRootPath() => RootDirectory.FullName;
+	public string GetRootPath() => HostPath.Normalize( RootDirectory.FullName );
 
 	/// <summary>
 	/// Gets the .sbproj file for this project
@@ -178,7 +179,7 @@ public sealed partial class Project
 	/// <summary>
 	/// Absolute path to the Code folder of the project.
 	/// </summary>
-	public string GetCodePath() => System.IO.Path.Combine( RootDirectory.FullName, "Code" );
+	public string GetCodePath() => System.IO.Path.Combine( GetRootPath(), "Code" );
 
 	/// <summary>
 	/// Returns true if the Code path exists
@@ -188,7 +189,7 @@ public sealed partial class Project
 	/// <summary>
 	/// Absolute path to the Editor folder of the project.
 	/// </summary>
-	public string GetEditorPath() => System.IO.Path.Combine( RootDirectory.FullName, "Editor" );
+	public string GetEditorPath() => System.IO.Path.Combine( GetRootPath(), "Editor" );
 
 	/// <summary>
 	/// Returns true if the Editor path exists
@@ -198,13 +199,13 @@ public sealed partial class Project
 	/// <summary>
 	/// Absolute path to the Assets folder of the project, or <see langword="null"/> if not set.
 	/// </summary>
-	public string GetAssetsPath() => System.IO.Path.Combine( RootDirectory.FullName, "Assets" );
+	public string GetAssetsPath() => System.IO.Path.Combine( GetRootPath(), "Assets" );
 
 	/// <summary>
 	/// Absolute path to the Localization folder of the project, or <see langword="null"/> if not set.
 	/// </summary>
 	/// <returns></returns>
-	public string GetLocalizationPath() => System.IO.Path.Combine( RootDirectory.FullName, "Localization" );
+	public string GetLocalizationPath() => System.IO.Path.Combine( GetRootPath(), "Localization" );
 
 	/// <summary>
 	/// Returns true if the Assets path exists

@@ -146,7 +146,16 @@ internal class CloudAssetDirectory : IDisposable
 
 	public IEnumerable<string> GetPackageFiles( Package package )
 	{
-		return files.Find( x => x.Package == package.FullIdent && x.Revision == package.Revision.VersionId ).Select( x => x.Path );
+		if ( package is null )
+			return Enumerable.Empty<string>();
+
+		var fullIdent = package.FullIdent;
+		var revision = package.Revision?.VersionId;
+
+		if ( revision is null )
+			return files.Find( x => x.Package == fullIdent ).Select( x => x.Path );
+
+		return files.Find( x => x.Package == fullIdent && x.Revision == revision.Value ).Select( x => x.Path );
 	}
 
 	/// <summary>
@@ -212,4 +221,3 @@ internal class CloudAssetDirectory : IDisposable
 		return packageCache.Values.ToList();
 	}
 }
-

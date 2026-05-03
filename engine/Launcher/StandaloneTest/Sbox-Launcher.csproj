@@ -22,7 +22,7 @@
 		<StartupObject>Sandbox.Program</StartupObject>
 		<ProduceReferenceAssembly>False</ProduceReferenceAssembly>
 		<DebugType>embedded</DebugType>
-		<ApplicationIcon>icon.ico</ApplicationIcon>
+		<ApplicationIcon Condition="Exists('icon.ico')">icon.ico</ApplicationIcon>
 		<GenerateDependencyFile>false</GenerateDependencyFile>
 		<TreatWarningsAsErrors>True</TreatWarningsAsErrors>
 		<CETCompat>false</CETCompat>

@@ -2,7 +2,7 @@
 
 namespace Facepunch.Steps;
 
-internal class BuildManaged( string name, bool clean = false ) : Step( name )
+internal class BuildManaged( string name, bool clean = false, string runtimeIdentifier = null ) : Step( name )
 {
 	protected override ExitCode RunInternal()
 	{
@@ -57,7 +57,8 @@ internal class BuildManaged( string name, bool clean = false ) : Step( name )
 			}
 
 			Log.Info( "Step 5: Build Managed" );
-			if ( !Utility.RunDotnetCommand( engineDir, "build -c Release Sandbox-Engine.slnx -p:TreatWarningsAsErrors=true" ) )
+			var runtimeProperty = string.IsNullOrWhiteSpace( runtimeIdentifier ) ? "" : $" -p:SboxRuntimeIdentifier={runtimeIdentifier}";
+			if ( !Utility.RunDotnetCommand( engineDir, $"build -c Release Sandbox-Engine.slnx -p:TreatWarningsAsErrors=true{runtimeProperty}" ) )
 				return ExitCode.Failure;
 
 			Log.Info( "Build completed successfully!" );

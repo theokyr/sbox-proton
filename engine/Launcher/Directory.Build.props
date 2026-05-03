@@ -4,6 +4,7 @@
   <PropertyGroup>
     <!-- SolutionDir is not defined when building projects explicitly -->
     <SolutionDir Condition=" '$(SolutionDir)' == '' ">$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), MySolution.sln))\</SolutionDir>
+    <RuntimeIdentifier Condition=" '$(SboxRuntimeIdentifier)' != '' ">$(SboxRuntimeIdentifier)</RuntimeIdentifier>
     <!-- Output paths -->
     <BaseIntermediateOutputPath>$(SolutionDir)bin\obj\$(Configuration)\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
     <IntermediateOutputPath>$(SolutionDir)bin\obj\$(Configuration)\$(MSBuildProjectName)\</IntermediateOutputPath>

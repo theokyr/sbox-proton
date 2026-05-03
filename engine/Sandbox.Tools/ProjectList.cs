@@ -11,15 +11,16 @@ public class ProjectList
 		Refresh();
 	}
 
-	public void Refresh()
-	{
-		All = new List<Project>();
-		All.AddRange( EngineFileSystem.Config.ReadJsonOrDefault( "/addons.json", new List<Project>() ) );
-
-		foreach ( var e in All )
+		public void Refresh()
 		{
-			e.LoadMinimal();
-		}
+			All = new List<Project>();
+			All.AddRange( EngineFileSystem.Config.ReadJsonOrDefault( "/addons.json", new List<Project>() ) );
+
+			foreach ( var e in All )
+			{
+				e.ConfigFilePath = HostPath.GetFullPath( e.ConfigFilePath );
+				e.LoadMinimal();
+			}
 
 		// Remove any broken projects from the list, e.g missing files (don't save incase they come back?)
 		All = All.Where( x => !x.Broken ).DistinctBy( x => x.ConfigFilePath ).ToList();
@@ -49,7 +50,7 @@ public class ProjectList
 		if ( !path.EndsWith( ".sbproj" ) )
 			path = System.IO.Path.Combine( path, ".sbproj" );
 
-		var cleanPath = System.IO.Path.GetFullPath( path );
+			var cleanPath = HostPath.GetFullPath( path );
 
 		// Don't add the same project twice
 		if ( All.Where( a => a.ConfigFilePath == cleanPath ).FirstOrDefault() is Project lp )

@@ -15,12 +15,52 @@ static class FrameworkReferences
 
 	static FrameworkReferences()
 	{
+		LoadExternalReferenceAssemblies();
+		LoadEmbeddedResources();
+	}
+
+	private static void LoadExternalReferenceAssemblies()
+	{
+		var searchRoots = new HashSet<string>( StringComparer.OrdinalIgnoreCase );
+		AddSearchRoot( searchRoots, AppContext.BaseDirectory );
+		AddSearchRoot( searchRoots, Directory.GetCurrentDirectory() );
+		AddSearchRoot( searchRoots, Path.GetDirectoryName( typeof( FrameworkReferences ).Assembly.Location ) );
+
+		foreach ( var refRoot in searchRoots )
+		{
+			if ( !Directory.Exists( refRoot ) )
+				continue;
+
+			foreach ( var referencePath in Directory.EnumerateFiles( refRoot, "*.dll", SearchOption.TopDirectoryOnly ) )
+			{
+				var name = Path.GetFileName( referencePath );
+				if ( All.ContainsKey( name ) )
+					continue;
+
+				All[name] = MetadataReference.CreateFromFile( referencePath );
+			}
+		}
+	}
+
+	private static void AddSearchRoot( HashSet<string> searchRoots, string root )
+	{
+		if ( string.IsNullOrWhiteSpace( root ) )
+			return;
+
+		root = HostPath.Normalize( root );
+
+		searchRoots.Add( Path.Combine( root, "refs" ) );
+		searchRoots.Add( Path.Combine( root, "refs", "net10.0" ) );
+		searchRoots.Add( Path.Combine( root, "bin", "managed", "refs" ) );
+		searchRoots.Add( Path.Combine( root, "bin", "managed", "refs", "net10.0" ) );
+	}
+
+	private static void LoadEmbeddedResources()
+	{
 		var assembly = Assembly.GetExecutingAssembly();
 		var resourceNames = assembly.GetManifestResourceNames()
 									.Where( name => name.EndsWith( ".dll", StringComparison.OrdinalIgnoreCase ) )
 									.ToArray();
-
-		var referenceFiles = new List<string>();
 
 		foreach ( var resourceName in resourceNames )
 		{
@@ -84,31 +124,5 @@ static class FrameworkReferences
 
 
 		return MetadataReference.CreateFromFile( assembly.Location );
-	}
-
-	private static List<string> LoadEmbeddedReferenceAssemblies()
-	{
-		var assembly = Assembly.GetExecutingAssembly();
-		var resourceNames = assembly.GetManifestResourceNames()
-			.Where( name => name.EndsWith( ".dll", StringComparison.OrdinalIgnoreCase ) )
-			.ToArray();
-
-		var tempDirectory = Path.Combine( Path.GetTempPath(), "EmbeddedRefs" );
-		Directory.CreateDirectory( tempDirectory );
-
-		var referenceFiles = new List<string>();
-
-		foreach ( var resourceName in resourceNames )
-		{
-			var outputPath = Path.Combine( tempDirectory, resourceName );
-			using ( var resourceStream = assembly.GetManifestResourceStream( resourceName ) )
-			using ( var fileStream = new FileStream( outputPath, FileMode.Create, FileAccess.Write ) )
-			{
-				resourceStream.CopyTo( fileStream );
-			}
-			referenceFiles.Add( outputPath );
-		}
-
-		return referenceFiles;
 	}
 }

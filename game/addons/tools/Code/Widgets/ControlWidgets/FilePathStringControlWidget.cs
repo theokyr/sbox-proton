@@ -169,17 +169,21 @@ public class FilePathStringControlWidget : ControlWidget
 		if ( obj is Asset asset )
 		{
 			SerializedProperty.SetValue( asset.RelativePath );
-		}
-		else if ( obj is string str )
-		{
-			var relativePath = System.IO.Path.GetRelativePath( Project.Current.GetAssetsPath(), str );
-			SerializedProperty.SetValue( relativePath );
-		}
-		else if ( obj is AssetEntry assetEntry )
-		{
-			var path = System.IO.Path.GetRelativePath( Project.Current.GetAssetsPath(), assetEntry.AbsolutePath );
-			SerializedProperty.SetValue( path );
-		}
+			}
+			else if ( obj is string str )
+			{
+				if ( HostPath.TryGetRelativeWithinRoot( Project.Current.GetAssetsPath(), str, out var relativePath ) )
+				{
+					SerializedProperty.SetValue( relativePath );
+				}
+			}
+			else if ( obj is AssetEntry assetEntry )
+			{
+				if ( HostPath.TryGetRelativeWithinRoot( Project.Current.GetAssetsPath(), assetEntry.AbsolutePath, out var path ) )
+				{
+					SerializedProperty.SetValue( path );
+				}
+			}
 		SerializedProperty.Parent.NoteFinishEdit( SerializedProperty );
 	}
 

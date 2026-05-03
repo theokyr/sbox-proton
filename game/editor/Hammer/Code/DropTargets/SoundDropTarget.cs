@@ -42,7 +42,20 @@ class SoundDropTarget : IMapViewDropTarget
 
 	static async void SetSoundFromPackage( Package package, MapEntity ent )
 	{
-		var asset = await AssetSystem.InstallAsync( package.FullIdent );
-		if ( ent.IsValid() ) ent.SetKeyValue( "soundName", asset.Path );
+		try
+		{
+			var asset = await AssetSystem.InstallAsync( package.FullIdent );
+			if ( asset is null || string.IsNullOrWhiteSpace( asset.Path ) )
+			{
+				Log.Warning( $"Couldn't resolve a sound asset from cloud package {package?.FullIdent}." );
+				return;
+			}
+
+			if ( ent.IsValid() ) ent.SetKeyValue( "soundName", asset.Path );
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Couldn't install sound from cloud package {package?.FullIdent}." );
+		}
 	}
 }

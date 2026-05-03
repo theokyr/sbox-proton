@@ -1,5 +1,6 @@
 ﻿using Sandbox.Engine;
 using System;
+using System.IO;
 using System.Text.Json.Nodes;
 using System.Threading;
 
@@ -60,8 +61,249 @@ public static partial class AssetSystem
 			EditorEvent.Run( "package.changed.installed", package );
 		}
 
+		return GetInstalledPackageAsset( package );
+	}
+
+	public static Asset GetInstalledPackageAsset( Package package, AssetType preferredType = null )
+	{
+		if ( package is null )
+			return null;
+
 		var primaryAssetName = package.PrimaryAsset;
-		return FindByPath( primaryAssetName );
+		if ( string.IsNullOrWhiteSpace( primaryAssetName ) )
+			primaryAssetName = package.GetMeta<string>( "PrimaryAsset" );
+
+		var primaryAsset = FindOrRegisterCloudAsset( primaryAssetName, preferredType );
+		if ( primaryAsset is not null )
+			return primaryAsset;
+
+		foreach ( var file in GetPackageFiles( package ) )
+		{
+			var asset = FindOrRegisterCloudAsset( file, preferredType );
+			if ( asset is not null )
+				return asset;
+		}
+
+		foreach ( var file in package.Revision?.Manifest?.Files ?? Enumerable.Empty<ManifestSchema.File>() )
+		{
+			var asset = FindOrRegisterCloudAsset( file.Path, preferredType );
+			if ( asset is not null )
+				return asset;
+		}
+
+		return null;
+	}
+
+	public static string GetInstalledPackageAssetPath( Package package, AssetType preferredType = null )
+	{
+		if ( package is null )
+			return null;
+
+		var asset = GetInstalledPackageAsset( package, preferredType );
+		if ( asset is not null )
+			return asset.Path;
+
+		if ( preferredType is not null && preferredType != AssetType.Material )
+			return null;
+
+		var primaryAssetName = package.PrimaryAsset;
+		if ( string.IsNullOrWhiteSpace( primaryAssetName ) )
+			primaryAssetName = package.GetMeta<string>( "PrimaryAsset" );
+
+		if ( IsCloudMaterialFile( primaryAssetName ) && FileSystem.Cloud.FileExists( primaryAssetName ) )
+			return primaryAssetName.NormalizeFilename( false );
+
+		foreach ( var file in GetPackageFiles( package ) )
+		{
+			if ( IsCloudMaterialFile( file ) && FileSystem.Cloud.FileExists( file ) )
+				return file.NormalizeFilename( false );
+		}
+
+		foreach ( var file in package.Revision?.Manifest?.Files ?? Enumerable.Empty<ManifestSchema.File>() )
+		{
+			if ( IsCloudMaterialFile( file.Path ) && FileSystem.Cloud.FileExists( file.Path ) )
+				return file.Path.NormalizeFilename( false );
+		}
+
+		var ident = package.Ident;
+		if ( !string.IsNullOrWhiteSpace( ident ) )
+		{
+			foreach ( var file in FileSystem.Cloud.FindFile( "/", $"{ident}.vmat", true ) )
+			{
+				return file.NormalizeFilename( false );
+			}
+		}
+
+		return null;
+	}
+
+	public static IEnumerable<string> GetInstalledPackageAssetPaths( Package package, AssetType preferredType = null )
+	{
+		if ( package is null )
+			yield break;
+
+		var seen = new HashSet<string>( StringComparer.OrdinalIgnoreCase );
+
+		var asset = GetInstalledPackageAsset( package, preferredType );
+		if ( asset is not null && !string.IsNullOrWhiteSpace( asset.Path ) && seen.Add( asset.Path ) )
+			yield return asset.Path;
+
+		if ( preferredType is not null && preferredType != AssetType.Material )
+			yield break;
+
+		var primaryAssetName = package.PrimaryAsset;
+		if ( string.IsNullOrWhiteSpace( primaryAssetName ) )
+			primaryAssetName = package.GetMeta<string>( "PrimaryAsset" );
+
+		if ( IsCloudMaterialFile( primaryAssetName ) && FileSystem.Cloud.FileExists( primaryAssetName ) && seen.Add( primaryAssetName ) )
+			yield return primaryAssetName.NormalizeFilename( false );
+
+		foreach ( var file in GetCloudPackageFilePaths( package ) )
+		{
+			if ( IsCloudMaterialFile( file ) && FileSystem.Cloud.FileExists( file ) && seen.Add( file ) )
+				yield return file.NormalizeFilename( false );
+		}
+
+		var ident = package.Ident;
+		if ( !string.IsNullOrWhiteSpace( ident ) )
+		{
+			foreach ( var file in FileSystem.Cloud.FindFile( "/", $"{ident}.vmat", true ) )
+			{
+				if ( seen.Add( file ) )
+					yield return file.NormalizeFilename( false );
+			}
+		}
+	}
+
+	public static bool StageCloudPackageInProjectLibrary( Package package )
+	{
+		if ( package is null || Project.Current is null )
+			return false;
+
+		var files = GetCloudPackageFilePaths( package ).ToArray();
+		if ( files.Length == 0 )
+			return false;
+
+		var root = Project.Current.GetRootPath();
+		if ( string.IsNullOrWhiteSpace( root ) )
+			return false;
+
+		var libraryRoot = HostPath.Normalize( Path.Combine( root, "Libraries", "CloudAssets" ) );
+		var assetsRoot = HostPath.Normalize( Path.Combine( libraryRoot, "Assets" ) );
+		var projectPath = Path.Combine( libraryRoot, "CloudAssets.sbproj" );
+
+		Directory.CreateDirectory( assetsRoot );
+
+		if ( !System.IO.File.Exists( projectPath ) )
+		{
+			System.IO.File.WriteAllText( projectPath, """
+			{
+			  "Title": "Generated Cloud Assets",
+			  "Type": "library",
+			  "Org": "local",
+			  "Ident": "sbox_cloud_assets"
+			}
+			""" );
+		}
+
+		var copied = 0;
+		foreach ( var file in files )
+		{
+			if ( string.IsNullOrWhiteSpace( file ) || !FileSystem.Cloud.FileExists( file ) )
+				continue;
+
+			var source = HostPath.Normalize( FileSystem.Cloud.GetFullPath( file ) );
+			var target = HostPath.Normalize( Path.Combine( assetsRoot, file ) );
+			var targetFolder = Path.GetDirectoryName( target );
+
+			if ( !string.IsNullOrWhiteSpace( targetFolder ) )
+				Directory.CreateDirectory( targetFolder );
+
+			if ( System.IO.File.Exists( target ) )
+			{
+				var sourceInfo = new FileInfo( source );
+				var targetInfo = new FileInfo( target );
+				if ( sourceInfo.Length == targetInfo.Length && sourceInfo.LastWriteTimeUtc <= targetInfo.LastWriteTimeUtc )
+					continue;
+			}
+
+			System.IO.File.Copy( source, target, true );
+			copied++;
+		}
+
+		EnsureProjectLibraryContentMounted( assetsRoot );
+
+		if ( copied > 0 )
+		{
+			Log.Info( $"Staged {copied} cloud package files in project library for {package.FullIdent}." );
+		}
+
+		return true;
+	}
+
+	static HashSet<string> MountedGeneratedLibraryPaths { get; } = new( StringComparer.OrdinalIgnoreCase );
+
+	static void EnsureProjectLibraryContentMounted( string assetsRoot )
+	{
+		if ( string.IsNullOrWhiteSpace( assetsRoot ) )
+			return;
+
+		assetsRoot = HostPath.Normalize( assetsRoot );
+
+		if ( MountedGeneratedLibraryPaths.Add( assetsRoot ) )
+		{
+			FileSystem.Content.CreateAndMount( assetsRoot );
+			FileSystem.Mounted.CreateAndMount( assetsRoot );
+			EngineFileSystem.LibraryContent.CreateAndMount( assetsRoot );
+		}
+
+		NativeEngine.FullFileSystem.AddProjectPath( "local.sbox_cloud_assets", assetsRoot );
+		NativeEngine.EngineGlue.AddSearchPath( assetsRoot, "GAME", true );
+		NativeEngine.EngineGlue.AddSearchPath( HostPath.ToWinePath( assetsRoot ), "GAME", true );
+	}
+
+	static IEnumerable<string> GetCloudPackageFilePaths( Package package )
+	{
+		var seen = new HashSet<string>( StringComparer.OrdinalIgnoreCase );
+
+		foreach ( var path in GetPackageFiles( package ) )
+		{
+			if ( !string.IsNullOrWhiteSpace( path ) && seen.Add( path ) )
+				yield return path;
+		}
+
+		foreach ( var file in package.Revision?.Manifest?.Files ?? Enumerable.Empty<ManifestSchema.File>() )
+		{
+			if ( !string.IsNullOrWhiteSpace( file.Path ) && seen.Add( file.Path ) )
+				yield return file.Path;
+		}
+	}
+
+	private static bool IsCloudMaterialFile( string path )
+	{
+		return !string.IsNullOrWhiteSpace( path ) && path.EndsWith( ".vmat", StringComparison.OrdinalIgnoreCase );
+	}
+
+	private static Asset FindOrRegisterCloudAsset( string path, AssetType preferredType )
+	{
+		if ( string.IsNullOrWhiteSpace( path ) )
+			return null;
+
+		var asset = FindByPath( path ) ?? FindByPath( FileSystem.Cloud.GetFullPath( path ) );
+		if ( asset is not null )
+			return preferredType is null || asset.AssetType == preferredType ? asset : null;
+
+		if ( !FileSystem.Cloud.FileExists( path ) )
+			return null;
+
+		asset = RegisterFile( FileSystem.Cloud.GetFullPath( path ) );
+		if ( asset is null )
+			return null;
+
+		if ( preferredType is not null && asset.AssetType != preferredType )
+			return null;
+
+		return asset;
 	}
 
 	internal static void UninstallPackage( Package package )
@@ -244,6 +486,9 @@ public static partial class AssetSystem
 
 	public static IReadOnlyCollection<string> GetPackageFiles( Package package )
 	{
+		if ( package is null || CloudDirectory is null )
+			return Array.Empty<string>();
+
 		return CloudDirectory.GetPackageFiles( package ).ToList();
 	}
 
@@ -336,4 +581,3 @@ public static partial class AssetSystem
 		}
 	}
 }
-
