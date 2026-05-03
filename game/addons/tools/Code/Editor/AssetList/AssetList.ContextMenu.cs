@@ -298,8 +298,8 @@ public partial class AssetList
 			}
 		}
 
-		var absolutePath = asset?.AbsolutePath ?? entry.AbsolutePath.Replace( '\\', '/' ).ToLower();
-		var relativePath = asset?.RelativePath ?? System.IO.Path.GetRelativePath( Project.Current.GetAssetsPath(), absolutePath ).Replace( '\\', '/' ).ToLower();
+			var absolutePath = asset?.AbsolutePath ?? HostPath.Normalize( entry.AbsolutePath ).ToLowerInvariant();
+			var relativePath = asset?.RelativePath ?? (HostPath.TryGetRelativeWithinRoot( Project.Current.GetAssetsPath(), absolutePath, out var rel ) ? rel.ToLowerInvariant() : null);
 
 		if ( asset is null || !asset.IsProcedural )
 		{

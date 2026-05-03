@@ -42,7 +42,20 @@ class SoundscapeDropTarget : IMapViewDropTarget
 
 	static async void SetSoundFromPackage( Package package, MapEntity ent )
 	{
-		var asset = await AssetSystem.InstallAsync( package.FullIdent );
-		if ( ent.IsValid() ) ent.SetKeyValue( "soundscape", asset.Path );
+		try
+		{
+			var asset = await AssetSystem.InstallAsync( package.FullIdent );
+			if ( asset is null || string.IsNullOrWhiteSpace( asset.Path ) )
+			{
+				Log.Warning( $"Couldn't resolve a soundscape asset from cloud package {package?.FullIdent}." );
+				return;
+			}
+
+			if ( ent.IsValid() ) ent.SetKeyValue( "soundscape", asset.Path );
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Couldn't install soundscape from cloud package {package?.FullIdent}." );
+		}
 	}
 }

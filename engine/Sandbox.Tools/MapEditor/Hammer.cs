@@ -108,7 +108,12 @@ public static partial class Hammer
 	public static void SetCurrentMaterial( Asset asset )
 	{
 		AssertAppValid();
-		ArgumentNullException.ThrowIfNull( asset );
+		if ( asset is null )
+		{
+			Log.Warning( "Tried to set Hammer material from a null asset." );
+			return;
+		}
+
 		if ( asset.AssetType != AssetType.Material ) throw new ArgumentException( "Asset must be a material" );
 
 		App.SetCurrentTexture( asset.GetCompiledFile() );

@@ -22,7 +22,7 @@
 		<StartupObject>Sandbox.Program</StartupObject>
 		<ProduceReferenceAssembly>False</ProduceReferenceAssembly>
 		<DebugType>embedded</DebugType>
-		<ApplicationIcon>sbox-server.ico</ApplicationIcon>
+		<ApplicationIcon Condition="Exists('sbox-server.ico')">sbox-server.ico</ApplicationIcon>
 		<GenerateDependencyFile>false</GenerateDependencyFile>
 		<CETCompat>false</CETCompat>
 	</PropertyGroup>

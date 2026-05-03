@@ -221,15 +221,14 @@ public class PathWidget : Widget
 		public string TargetPath { get; private set; }
 		public string RelativePath
 		{
-			get
-			{
-				var assetsPath = Project.Current.GetAssetsPath();
-				var relativePath = System.IO.Path.GetRelativePath( assetsPath, TargetPath );
-				relativePath = relativePath.Replace( '\\', '/' );
-				if ( relativePath.StartsWith( ".." ) ) return null;
-				return relativePath.ToLower();
+				get
+				{
+					if ( !HostPath.TryGetRelativeWithinRoot( Project.Current.GetAssetsPath(), TargetPath, out var relativePath ) )
+						return null;
+
+					return relativePath.ToLower();
+				}
 			}
-		}
 
 		public PathSeparator Separator { get; set; }
 

@@ -287,9 +287,9 @@ public partial class Project
 		if ( !Active )
 			return;
 
-		// Horrific, but Current isn't avaliable yet, so this is the only way to tell if we're in the menu project
-		var path = Sandbox.Utility.CommandLine.GetSwitch( "-project", "" ).TrimQuoted();
-		var isMenu = path.EndsWith( "menu\\.sbproj" );
+			// Horrific, but Current isn't avaliable yet, so this is the only way to tell if we're in the menu project
+			var path = Sandbox.Utility.CommandLine.GetSwitch( "-project", "" ).TrimQuoted();
+			var isMenu = HostPath.Normalize( path ).EndsWith( "menu/.sbproj", StringComparison.OrdinalIgnoreCase );
 
 		// only want menu editor code if we're in the menu project
 		if ( Config.Ident == "menu" && !isMenu )

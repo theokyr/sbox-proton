@@ -14,7 +14,23 @@ internal class HammerCloudBrowser : CloudAssetBrowser
 			if ( p.TypeName == "material" )
 			{
 				var asset = await AssetSystem.InstallAsync( p.FullIdent );
-				Hammer.SetCurrentMaterial( asset );
+				asset ??= AssetSystem.GetInstalledPackageAsset( p, AssetType.Material );
+				if ( asset is not null )
+				{
+					Hammer.SetCurrentMaterial( asset );
+				}
+				else
+				{
+					var materialPath = AssetSystem.GetInstalledPackageAssetPath( p, AssetType.Material );
+					if ( string.IsNullOrWhiteSpace( materialPath ) )
+					{
+						Log.Warning( $"Couldn't resolve a material asset from cloud package {p.FullIdent}." );
+					}
+					else
+					{
+						Log.Warning( $"Resolved cloud material {p.FullIdent} as {materialPath}, but no editor Asset was available for Hammer material selection." );
+					}
+				}
 			}
 		};
 	}

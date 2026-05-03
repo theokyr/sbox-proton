@@ -10,7 +10,14 @@ namespace Facepunch.Steps;
 /// <summary>
 /// Downloads public artifacts that match the current repository commit.
 /// </summary>
-internal class DownloadPublicArtifacts( string name, bool nativeBinariesOnly = false ) : Step( name )
+internal enum ArtifactSelection
+{
+	All,
+	NativeBinariesOnly,
+	ProtonWindows
+}
+
+internal class DownloadPublicArtifacts( string name, bool nativeBinariesOnly = false, ArtifactSelection selection = ArtifactSelection.All ) : Step( name )
 {
 	private const string BaseUrl = "https://artifacts.sbox.game";
 	private const int MaxParallelDownloads = 32;
@@ -72,7 +79,8 @@ internal class DownloadPublicArtifacts( string name, bool nativeBinariesOnly = f
 			}
 
 			var repoRoot = Path.TrimEndingDirectorySeparator( Path.GetFullPath( Directory.GetCurrentDirectory() ) );
-			return DownloadArtifacts( httpClient, manifest, repoRoot, nativeBinariesOnly );
+			var artifactSelection = nativeBinariesOnly ? ArtifactSelection.NativeBinariesOnly : selection;
+			return DownloadArtifacts( httpClient, manifest, repoRoot, artifactSelection );
 		}
 		catch ( AggregateException ex )
 		{
@@ -90,7 +98,7 @@ internal class DownloadPublicArtifacts( string name, bool nativeBinariesOnly = f
 		}
 	}
 
-	private static ExitCode DownloadArtifacts( HttpClient httpClient, ArtifactManifest manifest, string repoRoot, bool nativeBinariesOnly )
+	private static ExitCode DownloadArtifacts( HttpClient httpClient, ArtifactManifest manifest, string repoRoot, ArtifactSelection selection )
 	{
 		var updatedCount = 0;
 		var skippedCount = 0;
@@ -106,7 +114,7 @@ internal class DownloadPublicArtifacts( string name, bool nativeBinariesOnly = f
 				return;
 			}
 
-			if ( nativeBinariesOnly && !entry.Path.StartsWith( "game/bin/", StringComparison.OrdinalIgnoreCase ) )
+			if ( !ShouldDownload( entry.Path, selection ) )
 			{
 				Interlocked.Increment( ref skippedCount );
 				return;
@@ -146,6 +154,42 @@ internal class DownloadPublicArtifacts( string name, bool nativeBinariesOnly = f
 
 		Log.Info( $"Artifact download completed successfully. Updated {updatedCount} file(s), skipped {skippedCount}." );
 		return ExitCode.Success;
+	}
+
+	private static bool ShouldDownload( string path, ArtifactSelection selection )
+	{
+		return selection switch
+		{
+			ArtifactSelection.All => true,
+			ArtifactSelection.NativeBinariesOnly => path.StartsWith( "game/bin/", StringComparison.OrdinalIgnoreCase ),
+			ArtifactSelection.ProtonWindows => IsWindowsRuntimeArtifact( path ) || IsCompiledGameAsset( path ),
+			_ => true
+		};
+	}
+
+	private static bool IsWindowsRuntimeArtifact( string path )
+	{
+		return path.StartsWith( "game/bin/win64/", StringComparison.OrdinalIgnoreCase )
+			|| path.Equals( "game/bin/runtimeconfig.json", StringComparison.OrdinalIgnoreCase )
+			|| path.Equals( "game/bin/assettypes.txt", StringComparison.OrdinalIgnoreCase )
+			|| path.Equals( "game/bin/enginetools.txt", StringComparison.OrdinalIgnoreCase );
+	}
+
+	private static bool IsCompiledGameAsset( string path )
+	{
+		if ( !path.StartsWith( "game/", StringComparison.OrdinalIgnoreCase ) )
+			return false;
+
+		if ( !path.EndsWith( "_c", StringComparison.OrdinalIgnoreCase ) )
+			return false;
+
+		return path.StartsWith( "game/addons/", StringComparison.OrdinalIgnoreCase )
+			|| path.StartsWith( "game/core/", StringComparison.OrdinalIgnoreCase )
+			|| path.StartsWith( "game/config/", StringComparison.OrdinalIgnoreCase )
+			|| path.StartsWith( "game/editor/", StringComparison.OrdinalIgnoreCase )
+			|| path.StartsWith( "game/mount/", StringComparison.OrdinalIgnoreCase )
+			|| path.StartsWith( "game/samples/", StringComparison.OrdinalIgnoreCase )
+			|| path.StartsWith( "game/templates/", StringComparison.OrdinalIgnoreCase );
 	}
 
 	private static HttpClient CreateHttpClient()

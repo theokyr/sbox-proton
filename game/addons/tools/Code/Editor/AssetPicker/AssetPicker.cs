@@ -132,12 +132,18 @@ public abstract class AssetPicker : Dialog
 			}
 			else
 			{
-				string assetPath = package.GetMeta<string>( "PrimaryAsset" );
-				a = AssetSystem.FindByPath( assetPath );
+				a = AssetSystem.GetInstalledPackageAsset( package, AssetType );
 
 				if ( a is null )
 				{
-					Log.Error( $"Failed to find installed package: {package.FullIdent}" );
+					Hide();
+					a = await AssetSystem.InstallAsync( package.FullIdent, false );
+					a ??= AssetSystem.GetInstalledPackageAsset( package, AssetType );
+
+					if ( a is null )
+					{
+						Log.Error( $"Failed to find installed package: {package.FullIdent}" );
+					}
 				}
 			}
 

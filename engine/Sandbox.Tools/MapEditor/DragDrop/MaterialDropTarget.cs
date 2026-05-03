@@ -19,11 +19,10 @@ class MaterialDropTarget : IMapViewDropTarget
 	public void DragEnter( Package package, MapView view )
 	{
 		doc = view.MapDoc;
+		SavedObjects = CSavedObjects.Create();
 
 		// Start fetching the material, what we could maybe do is make a fake material from the thumbnail
 		_ = GetMaterialFromPackage( package );
-
-		SavedObjects = CSavedObjects.Create();
 	}
 
 	/// <summary>
@@ -116,16 +115,41 @@ class MaterialDropTarget : IMapViewDropTarget
 
 	async Task GetMaterialFromPackage( Package package )
 	{
-		// Install our package ( Do we need any sort of loading indicator, it's gonna be fast surely )
-		var asset = await AssetSystem.InstallAsync( package );
-		Material = Material.Load( asset.Path );
+		try
+		{
+			// Install our package ( Do we need any sort of loading indicator, it's gonna be fast surely )
+			var asset = await AssetSystem.InstallAsync( package );
+			asset ??= AssetSystem.GetInstalledPackageAsset( package, AssetType.Material );
 
-		CreateNode();
+			AssetSystem.StageCloudPackageInProjectLibrary( package );
+
+			foreach ( var materialPath in AssetSystem.GetInstalledPackageAssetPaths( package, AssetType.Material ) )
+			{
+				if ( string.IsNullOrWhiteSpace( materialPath ) )
+					continue;
+
+				Material = Material.Load( materialPath );
+				if ( Material is not null )
+					break;
+			}
+
+			if ( Material is null )
+			{
+				Log.Warning( $"Couldn't load material from cloud package {package?.FullIdent}." );
+				return;
+			}
+
+			CreateNode();
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Couldn't install material from cloud package {package?.FullIdent}." );
+		}
 	}
 
 	public void CreateNode()
 	{
-		if ( !doc.IsValid() ) return;
+		if ( !doc.IsValid() || Material is null ) return;
 
 		// This fucking stupid shit is defined from shaders wtf
 		if ( Material.Attributes.GetInt( "decal", 0 ) == 1 )

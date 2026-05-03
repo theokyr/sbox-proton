@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <ApplicationIcon>icon.ico</ApplicationIcon>
+    <ApplicationIcon Condition="Exists('icon.ico')">icon.ico</ApplicationIcon>
     <NoWarn>1701;1702;1591</NoWarn>
 	<OutputPath>..\..\..\game\bin\managed</OutputPath>
 	<AllowUnsafeBlocks>True</AllowUnsafeBlocks>

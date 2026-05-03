@@ -17,6 +17,7 @@ internal class Program
 		var rootCommand = new RootCommand( "sboxbuild - Build and deployment tool for s&box\n\nRun this from your sbox project root." );
 
 		AddBuildPipeline( rootCommand );
+		AddBuildProtonPipeline( rootCommand );
 		AddFormatPipeline( rootCommand );
 		AddBuildContentStep( rootCommand );
 		AddTestStep( rootCommand );
@@ -32,6 +33,45 @@ internal class Program
 
 		rootCommand.Invoke( args );
 		return Environment.ExitCode;
+	}
+
+	private static void AddBuildProtonPipeline( RootCommand rootCommand )
+	{
+		var buildCommand = new Command( "build-proton", "Build a Windows apphost build suitable for running through Proton" );
+
+		var targetPlatformOption = new Option<string>(
+			"--target-platform",
+			description: "Target binary platform",
+			getDefaultValue: () => "win64" );
+
+		var runtimeOption = new Option<string>(
+			"--runtime",
+			description: ".NET runtime identifier for launcher apphosts",
+			getDefaultValue: () => "win-x64" );
+
+		var cleanOption = new Option<bool>(
+			"--clean",
+			description: "Whether to do a clean managed build",
+			getDefaultValue: () => false );
+
+		var skipArtifactsOption = new Option<bool>(
+			"--skip-artifacts",
+			description: "Skip downloading public Windows/native artifacts; use artifacts already present in game/bin/win64",
+			getDefaultValue: () => false );
+
+		buildCommand.AddOption( targetPlatformOption );
+		buildCommand.AddOption( runtimeOption );
+		buildCommand.AddOption( cleanOption );
+		buildCommand.AddOption( skipArtifactsOption );
+
+		buildCommand.SetHandler( ( string targetPlatform, string runtime, bool clean, bool skipArtifacts ) =>
+		{
+			var pipeline = BuildProton.Create( targetPlatform, runtime, clean, skipArtifacts );
+			ExitCode result = pipeline.Run();
+			Environment.ExitCode = (int)result;
+		}, targetPlatformOption, runtimeOption, cleanOption, skipArtifactsOption );
+
+		rootCommand.Add( buildCommand );
 	}
 
 	private static void AddBuildPipeline( RootCommand rootCommand )
