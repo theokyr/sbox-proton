@@ -258,8 +258,10 @@ public static partial class AssetSystem
 		}
 
 		NativeEngine.FullFileSystem.AddProjectPath( "local.sbox_cloud_assets", assetsRoot );
-		NativeEngine.EngineGlue.AddSearchPath( assetsRoot, "GAME", true );
-		NativeEngine.EngineGlue.AddSearchPath( HostPath.ToWinePath( assetsRoot ), "GAME", true );
+		foreach ( var searchPath in HostPath.GetNativeSearchPaths( assetsRoot ) )
+		{
+			NativeEngine.EngineGlue.AddSearchPath( searchPath, "GAME", true );
+		}
 	}
 
 	static IEnumerable<string> GetCloudPackageFilePaths( Package package )

@@ -41,12 +41,17 @@ public static partial class AssetSystem
 
 	internal static void InitializeFromProject( Project project )
 	{
-		string path = System.IO.Path.Combine( project.GetRootPath(), ".sbox", "cloud.db" );
+		string path = GetCloudDatabasePath( project.GetRootPath() );
 		CloudDirectory = new CloudAssetDirectory( path );
 
 		HasChanges = true;
 		IsInitialized = true;
 		Tick();
+	}
+
+	internal static string GetCloudDatabasePath( string rootPath )
+	{
+		return HostPath.Normalize( System.IO.Path.Combine( rootPath, ".sbox", "cloud.db" ), true );
 	}
 
 	internal static void Shutdown()

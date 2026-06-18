@@ -1,3 +1,5 @@
+using System;
+
 namespace SystemTests;
 
 [TestClass]
@@ -220,11 +222,20 @@ public class StringExtensionsTest
 	[DataTestMethod]
 	[DataRow( "/home/theo/project/.sbproj", false, "/home/theo/project/.sbproj" )]
 	[DataRow( "Z:\\home\\theo\\project\\.sbproj", true, "/home/theo/project/.sbproj" )]
+	[DataRow( "S:\\home\\theo\\src\\sbox\\ultraneon\\.sbox\\cloud-log.db", true, "/home/theo/src/sbox/ultraneon/.sbox/cloud-log.db" )]
 	[DataRow( "z:/home/theo/.local/share/sbox", true, "/home/theo/.local/share/sbox" )]
 	[DataRow( "C:\\Users\\steamuser\\Documents\\Game\\.sbproj", true, "C:/Users/steamuser/Documents/Game/.sbproj" )]
 	public void HostPath_Normalize( string input, bool convertWinePaths, string expected )
 	{
 		Assert.AreEqual( expected, HostPath.Normalize( input, convertWinePaths ) );
+	}
+
+	[TestMethod]
+	public void HostPath_Normalize_ConvertsSelfIdentifyingWineUnixDrivePath()
+	{
+		var path = System.IO.Path.Combine( "S:\\home\\theo\\src\\sbox\\ultraneon", ".sbox", "cloud.db" );
+
+		Assert.AreEqual( "/home/theo/src/sbox/ultraneon/.sbox/cloud.db", HostPath.Normalize( path ) );
 	}
 
 	[TestMethod]
@@ -235,5 +246,141 @@ public class StringExtensionsTest
 
 		Assert.IsFalse( HostPath.TryGetRelativeWithinRoot( "/home/theo/project/Assets", "/home/theo/other/Assets/test.vtex", out _, true ) );
 		Assert.IsFalse( HostPath.TryGetRelativeWithinRoot( "C:\\Project\\Assets", "Z:\\home\\theo\\project\\Assets\\maps\\test.vmap", out _, true ) );
+	}
+
+	[TestMethod]
+	public void HostPath_GetNativeSearchPaths_UsesDriveCAliasForSymlinkedPath()
+	{
+		var tempRoot = System.IO.Path.Combine( System.IO.Path.GetTempPath(), $"sbox-hostpath-{Guid.NewGuid():N}" );
+		var target = System.IO.Path.Combine( tempRoot, "real-sbox" );
+		var prefix = System.IO.Path.Combine( tempRoot, "compatdata", "2129370" );
+		var alias = System.IO.Path.Combine( prefix, "pfx", "drive_c", "sbox" );
+		var searchPath = System.IO.Path.Combine( target, "addons", "menu", "transients" );
+
+		try
+		{
+			System.IO.Directory.CreateDirectory( searchPath );
+			System.IO.Directory.CreateDirectory( System.IO.Path.GetDirectoryName( alias )! );
+			System.IO.Directory.CreateSymbolicLink( alias, target );
+
+			var paths = HostPath.GetNativeSearchPaths( searchPath, prefix ).ToArray();
+
+			CollectionAssert.AreEqual( new[] { "C:/sbox/addons/menu/transients" }, paths );
+			Assert.IsFalse( paths.Any( x => x.StartsWith( "Z:", StringComparison.OrdinalIgnoreCase ) ) );
+		}
+		catch ( Exception e ) when ( e is PlatformNotSupportedException || e is UnauthorizedAccessException || e is System.IO.IOException )
+		{
+			Assert.Inconclusive( $"Symlink creation unavailable in this environment: {e.Message}" );
+		}
+		finally
+		{
+			if ( System.IO.Directory.Exists( tempRoot ) )
+			{
+				System.IO.Directory.Delete( tempRoot, true );
+			}
+		}
+	}
+
+	[TestMethod]
+	public void HostPath_GetNativeSearchPaths_AddsZFallbackForVisibleUnixPathWithoutDriveCAlias()
+	{
+		var tempRoot = System.IO.Path.Combine( System.IO.Path.GetTempPath(), $"sbox-hostpath-{Guid.NewGuid():N}" );
+		var prefix = System.IO.Path.Combine( tempRoot, "compatdata", "2129370" );
+
+		try
+		{
+			System.IO.Directory.CreateDirectory( System.IO.Path.Combine( prefix, "pfx", "drive_c" ) );
+
+			var paths = HostPath.GetNativeSearchPaths( "/home/theo/src/sbox/ultraneon/Assets", prefix ).ToArray();
+
+			CollectionAssert.AreEqual( new[] { "Z:/home/theo/src/sbox/ultraneon/Assets" }, paths );
+		}
+		finally
+		{
+			if ( System.IO.Directory.Exists( tempRoot ) )
+			{
+				System.IO.Directory.Delete( tempRoot, true );
+			}
+		}
+	}
+
+	[TestMethod]
+	public void HostPath_GetNativeSearchPaths_DoesNotAddZFallbackForHiddenUnixPathWithoutDriveCAlias()
+	{
+		var tempRoot = System.IO.Path.Combine( System.IO.Path.GetTempPath(), $"sbox-hostpath-{Guid.NewGuid():N}" );
+		var prefix = System.IO.Path.Combine( tempRoot, "compatdata", "2129370" );
+
+		try
+		{
+			System.IO.Directory.CreateDirectory( System.IO.Path.Combine( prefix, "pfx", "drive_c" ) );
+
+			var paths = HostPath.GetNativeSearchPaths( "/home/theo/.local/share/Steam/steamapps/common/sbox/addons/menu/transients", prefix ).ToArray();
+
+			Assert.AreEqual( 0, paths.Length );
+		}
+		finally
+		{
+			if ( System.IO.Directory.Exists( tempRoot ) )
+			{
+				System.IO.Directory.Delete( tempRoot, true );
+			}
+		}
+	}
+
+	[TestMethod]
+	public void HostPath_GetNativeSearchPaths_AddsZFallbackForProjectCloudCacheWithoutDriveCAlias()
+	{
+		var tempRoot = System.IO.Path.Combine( System.IO.Path.GetTempPath(), $"sbox-hostpath-{Guid.NewGuid():N}" );
+		var prefix = System.IO.Path.Combine( tempRoot, "compatdata", "2129370" );
+
+		try
+		{
+			System.IO.Directory.CreateDirectory( System.IO.Path.Combine( prefix, "pfx", "drive_c" ) );
+
+			var paths = HostPath.GetNativeSearchPaths( "/home/theo/src/sbox/ultraneon/.sbox/cloud", prefix ).ToArray();
+
+			CollectionAssert.AreEqual( new[] { "Z:/home/theo/src/sbox/ultraneon/.sbox/cloud" }, paths );
+		}
+		finally
+		{
+			if ( System.IO.Directory.Exists( tempRoot ) )
+			{
+				System.IO.Directory.Delete( tempRoot, true );
+			}
+		}
+	}
+
+	[TestMethod]
+	public void HostPath_GetNativeSearchPaths_UsesDosDeviceAliasForHiddenSteamPath()
+	{
+		var tempRoot = System.IO.Path.Combine( System.IO.Path.GetTempPath(), $"sbox-hostpath-{Guid.NewGuid():N}" );
+		var prefix = System.IO.Path.Combine( tempRoot, "compatdata", "2129370" );
+		var steamApps = System.IO.Path.Combine( tempRoot, ".local", "share", "Steam", "steamapps" );
+		var searchPath = System.IO.Path.Combine( steamApps, "common", "sbox", "addons", "menu", "transients" );
+		var dosDevices = System.IO.Path.Combine( prefix, "pfx", "dosdevices" );
+		var alias = System.IO.Path.Combine( dosDevices, "s:" );
+
+		try
+		{
+			System.IO.Directory.CreateDirectory( searchPath );
+			System.IO.Directory.CreateDirectory( System.IO.Path.Combine( prefix, "pfx", "drive_c" ) );
+			System.IO.Directory.CreateDirectory( dosDevices );
+			System.IO.Directory.CreateSymbolicLink( alias, steamApps );
+
+			var paths = HostPath.GetNativeSearchPaths( searchPath, prefix ).ToArray();
+
+			CollectionAssert.AreEqual( new[] { "S:/common/sbox/addons/menu/transients" }, paths );
+		}
+		catch ( Exception e ) when ( e is PlatformNotSupportedException || e is UnauthorizedAccessException || e is System.IO.IOException )
+		{
+			Assert.Inconclusive( $"Symlink creation unavailable in this environment: {e.Message}" );
+		}
+		finally
+		{
+			if ( System.IO.Directory.Exists( tempRoot ) )
+			{
+				System.IO.Directory.Delete( tempRoot, true );
+			}
+		}
 	}
 	}

@@ -17,6 +17,8 @@ static class StartupLoadProject
 
 	public static Logger Log = new( "Startup" );
 
+	internal readonly record struct NativeResourceMount( string ProjectIdent, string CloudIdent, string Path, bool Head );
+
 	static int CurrentStep;
 	static int TotalSteps;
 
@@ -292,28 +294,10 @@ static class StartupLoadProject
 		if ( !System.IO.Directory.Exists( assetsPath ) )
 			return;
 
-		NativeEngine.FullFileSystem.AddProjectPath( project.Config.FullIdent, assetsPath );
-
-		var cloudFolder = HostPath.Normalize( System.IO.Path.Combine( project.GetRootPath(), ".sbox", "cloud" ) );
-		NativeEngine.FullFileSystem.AddCloudPath( "mod_cloud", cloudFolder );
-		NativeEngine.EngineGlue.AddSearchPath( cloudFolder, "GAME", true );
-		NativeEngine.EngineGlue.AddSearchPath( HostPath.ToWinePath( cloudFolder ), "GAME", true );
-
-		var transientFolder = HostPath.Normalize( System.IO.Path.Combine( project.GetRootPath(), ".sbox", "transient" ) );
-		NativeEngine.FullFileSystem.AddCloudPath( "mod_transient", transientFolder );
-		NativeEngine.EngineGlue.AddSearchPath( transientFolder, "GAME", true );
-		NativeEngine.EngineGlue.AddSearchPath( HostPath.ToWinePath( transientFolder ), "GAME", true );
-
-		//
-		// The engine ships a bunch of transient files, like image generations from the addon base, and
-		// cloud assets that the menu scene uses. Mount them last, but no need in the menu project.
-		//
-		if ( project.Config.Ident != "menu" )
+		var engineTransient = HostPath.Normalize( EngineFileSystem.Root.GetFullPath( "addons/menu/transients" ) );
+		foreach ( var mount in GetNativeResourceMounts( project.Config.FullIdent, project.Config.Ident, project.GetRootPath(), assetsPath, engineTransient ) )
 		{
-			var engineTransient = HostPath.Normalize( EngineFileSystem.Root.GetFullPath( "addons/menu/transients" ) );
-			NativeEngine.FullFileSystem.AddCloudPath( "mod_engtrans", engineTransient );
-			NativeEngine.EngineGlue.AddSearchPath( engineTransient, "GAME", false );
-			NativeEngine.EngineGlue.AddSearchPath( HostPath.ToWinePath( engineTransient ), "GAME", false );
+			RegisterNativeResourceMount( mount );
 		}
 
 		Editor.FileSystem.RebuildContentPath();
@@ -321,6 +305,64 @@ static class StartupLoadProject
 		if ( !Sandbox.Application.IsUnitTest )
 		{
 			IAssetSystem.UpdateMods();
+		}
+	}
+
+	internal static IEnumerable<NativeResourceMount> GetNativeResourceMounts( string projectFullIdent, string projectIdent, string rootPath, string assetsPath, string engineTransientPath )
+	{
+		rootPath = HostPath.Normalize( rootPath );
+		assetsPath = HostPath.Normalize( assetsPath );
+
+		yield return new NativeResourceMount( projectFullIdent, null, assetsPath, true );
+		yield return new NativeResourceMount( $"{projectFullIdent}.cloud", "mod_cloud", HostPath.Normalize( System.IO.Path.Combine( rootPath, ".sbox", "cloud" ) ), true );
+		yield return new NativeResourceMount( $"{projectFullIdent}.transient", "mod_transient", HostPath.Normalize( System.IO.Path.Combine( rootPath, ".sbox", "transient" ) ), true );
+
+		//
+		// The engine ships transient files, like image generations from the addon base,
+		// and cloud assets that the menu scene uses. Mount them last, but not in menu.
+		//
+		if ( !string.Equals( projectIdent, "menu", StringComparison.OrdinalIgnoreCase ) )
+		{
+			yield return new NativeResourceMount( "local.sbox_engine_transient", "mod_engtrans", HostPath.Normalize( engineTransientPath ), false );
+		}
+	}
+
+	static void RegisterNativeResourceMount( NativeResourceMount mount )
+	{
+		var nativePath = GetPreferredNativeMountPath( mount.Path );
+		if ( string.IsNullOrWhiteSpace( nativePath ) )
+			return;
+
+		if ( !string.IsNullOrWhiteSpace( mount.ProjectIdent ) )
+			NativeEngine.FullFileSystem.AddProjectPath( mount.ProjectIdent, nativePath );
+
+		if ( !string.IsNullOrWhiteSpace( mount.CloudIdent ) )
+			NativeEngine.FullFileSystem.AddCloudPath( mount.CloudIdent, nativePath );
+
+		AddNativeSearchPaths( mount.Path, mount.Head );
+	}
+
+	static string GetPreferredNativeMountPath( string path )
+	{
+		var paths = HostPath.GetNativeSearchPaths( path ).Distinct( StringComparer.OrdinalIgnoreCase ).ToArray();
+		if ( paths.Length == 0 )
+			return null;
+
+		return paths.FirstOrDefault( x => x.StartsWith( "C:", StringComparison.OrdinalIgnoreCase ) )
+			?? paths.FirstOrDefault( IsWineDrivePath )
+			?? paths[0];
+	}
+
+	static bool IsWineDrivePath( string path )
+	{
+		return path.Length >= 3 && char.IsLetter( path[0] ) && path[1] == ':' && (path[2] == '/' || path[2] == '\\');
+	}
+
+	static void AddNativeSearchPaths( string path, bool head )
+	{
+		foreach ( var searchPath in HostPath.GetNativeSearchPaths( path ) )
+		{
+			NativeEngine.EngineGlue.AddSearchPath( searchPath, "GAME", head );
 		}
 	}
 
