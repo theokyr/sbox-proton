@@ -22,9 +22,9 @@ internal class NativeAsset : Asset
 		Name = native.GetFriendlyName_Transient().NormalizeFilename( false );
 		RelativePath = native.GetRelativePath_Transient( AssetLocation_t.Invalid ).NormalizeFilename( false );
 		Path = System.IO.Path.ChangeExtension( RelativePath, AssetType.FileExtension ).NormalizeFilename( false );
-		AbsolutePath = HostPath.Normalize( native.GetAbsolutePath_Transient( AssetLocation_t.Invalid ).NormalizeFilename( false ) ); // invalid means get any
-		AbsoluteSourcePath = HostPath.Normalize( native.GetAbsolutePath_Transient( AssetLocation_t.Content ).NormalizeFilename( false ) ); // invalid means get any
-		AbsoluteCompiledPath = HostPath.Normalize( native.GetAbsolutePath_Transient( AssetLocation_t.Game ).NormalizeFilename( false ) ); // invalid means get any
+		AbsolutePath = NormalizeAbsoluteAssetPathForHost( native.GetAbsolutePath_Transient( AssetLocation_t.Invalid ) ); // invalid means get any
+		AbsoluteSourcePath = NormalizeAbsoluteAssetPathForHost( native.GetAbsolutePath_Transient( AssetLocation_t.Content ) ); // invalid means get any
+		AbsoluteCompiledPath = NormalizeAbsoluteAssetPathForHost( native.GetAbsolutePath_Transient( AssetLocation_t.Game ) ); // invalid means get any
 		IsDeleted = string.IsNullOrEmpty( AbsolutePath );
 
 		if ( AssetSystem.CloudDirectory is not null )
@@ -71,7 +71,7 @@ internal class NativeAsset : Asset
 	public override string GetCompiledFile( bool absolute = false )
 	{
 		if ( absolute )
-			return HostPath.Normalize( native.GetAbsolutePath_Transient( AssetLocation_t.Game ).NormalizeFilename( false ) );
+			return NormalizeAbsoluteAssetPathForHost( native.GetAbsolutePath_Transient( AssetLocation_t.Game ) );
 
 		return native.GetRelativePath_Transient( AssetLocation_t.Game ).NormalizeFilename( false );
 	}
@@ -84,11 +84,17 @@ internal class NativeAsset : Asset
 	public override string GetSourceFile( bool absolute = false )
 	{
 		if ( absolute )
-			return HostPath.Normalize( native.GetAbsolutePath_Transient( AssetLocation_t.Content ).NormalizeFilename( false ) );
+			return NormalizeAbsoluteAssetPathForHost( native.GetAbsolutePath_Transient( AssetLocation_t.Content ) );
 
 		return native.GetRelativePath_Transient( AssetLocation_t.Content ).NormalizeFilename( false );
 	}
 
+	internal static string NormalizeAbsoluteAssetPathForHost( string path )
+	{
+		return string.IsNullOrWhiteSpace( path )
+			? path
+			: HostPath.Normalize( path.NormalizeFilename( false, false ) );
+	}
 
 	internal override int FindIntEditInfo( string name )
 	{
