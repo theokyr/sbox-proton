@@ -94,24 +94,20 @@ public sealed partial class SceneMap : IValid
 	{
 		Assert.IsValid( sceneWorld );
 
-		MapFolder = System.IO.Path.ChangeExtension( map, null );
+		var mapReference = NormalizeMapReference( map );
 
-		// CWorldRendererMgr::GetLocalMapName just strips maps/ from the start and uses that
-		map = System.IO.Path.ChangeExtension( map, null );
-		map = map.TrimStart( '\\', '/', ' ' );
-		if ( map.StartsWith( "maps/" ) ) map = map[5..];
-
-		if ( string.IsNullOrWhiteSpace( map ) )
+		if ( string.IsNullOrWhiteSpace( mapReference.MapName ) )
 			return false;
 
-		MapName = map;
+		MapName = mapReference.MapName;
+		MapFolder = mapReference.MapFolder;
 
 		const bool loadVis = true;
 		const bool precacheOnly = false;
 
 		var worldGroup = sceneWorld.native.GetWorldDebugName();
 		var worldRef = g_pWorldRendererMgr.CreateWorld(
-			MapFolder + ".vpk",
+			mapReference.NativeVpkPath,
 			sceneWorld,
 			async,
 			true,
@@ -122,7 +118,7 @@ public sealed partial class SceneMap : IValid
 
 		if ( !worldRef.IsValid )
 		{
-			Log.Warning( $"{this}: Unable to create world for map {map}" );
+			Log.Warning( $"{this}: Unable to create world for map {MapName}" );
 			return false;
 		}
 
@@ -144,6 +140,23 @@ public sealed partial class SceneMap : IValid
 
 		return true;
 	}
+
+	internal static MapReference NormalizeMapReference( string map )
+	{
+		map = System.IO.Path.ChangeExtension( map, null );
+		map = map?.Replace( '\\', '/' ).TrimStart( '/', ' ' );
+
+		if ( map?.StartsWith( "maps/", StringComparison.OrdinalIgnoreCase ) == true )
+			map = map[5..];
+
+		map = map?.TrimStart( '/', ' ' );
+
+		return string.IsNullOrWhiteSpace( map )
+			? default
+			: new MapReference( map, map, $"{map}.vpk" );
+	}
+
+	internal readonly record struct MapReference( string MapName, string MapFolder, string NativeVpkPath );
 
 	private void OnWorldLoaded()
 	{
