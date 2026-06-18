@@ -87,6 +87,24 @@ If Steam is installed somewhere nonstandard, pass an explicit destination:
 
 The deploy script stages .NET reference assemblies for the in-editor compiler and copies discovered fallback fonts into `game/fonts/proton`. Hammer cloud materials are staged into each project's generated library at `Libraries/CloudAssets/Assets` so native Source 2 resource loading can resolve package material and texture paths under Proton.
 
+## Proton Path Troubleshooting
+
+When debugging editor launch or Hammer/resource-compiler failures under Proton, treat every path crossing from managed code into Source 2 native code as a Windows-facing contract:
+
+* Normalize Wine drive paths such as `Z:\home\...` and nonstandard drive aliases before using them as host filesystem paths.
+* Prefer Proton-visible native search paths for the resource compiler. Raw Linux paths can be reinterpreted into invalid mixed paths by Windows-side Source 2 code.
+* Keep project-owned `.sbox/cloud` mounted. Compiled cloud package resources, including shader resources referenced by project materials, can live there.
+* Normalize map references before native VPK lookup so `maps/example.vmap` resolves to `example.vpk`, not a doubled `maps/maps/...` path.
+
+## Public Fork Hygiene
+
+Before pushing this fork to a public remote:
+
+* Use synthetic paths and project identifiers in tests and docs.
+* Leave local project caches, Steam install paths, and generated menu transient assets out of commits.
+* Review `git status --short` after `./build-and-deploy.sh --apply`; deployment can leave tracked runtime config files or generated assets dirty in the working tree.
+* Keep fork-specific notes above this section and leave the upstream README body intact.
+
 ## Upstream README
 
 <div align="center">
