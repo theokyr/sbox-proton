@@ -35,6 +35,7 @@ public sealed partial class ObjectSelection( MeshTool tool ) : SelectionTool
 		{
 			var ops = menu.AddMenu( "Object Operations", "build" );
 			AddMenuOption( ops, "Merge Meshes", "join_full", "mesh.merge-meshes", manyMeshes );
+			AddMenuOption( ops, "Boolean Tool", "difference", "mesh.boolean-tool", manyMeshes );
 			AddMenuOption( ops, "Convert To Mesh", "auto_mode", "mesh.convert-model-to-mesh", convertible );
 			AddMenuOption( ops, "Flip Faces", "flip", "mesh.flip-all-mesh-faces", hasMeshes );
 		}
@@ -46,6 +47,10 @@ public sealed partial class ObjectSelection( MeshTool tool ) : SelectionTool
 			AddMenuOption( transform, "Set Origin To Pivot", "gps_fixed", "mesh.set-origin-to-pivot", true );
 			AddMenuOption( transform, "Center Origin", "center_focus_strong", "mesh.center-origin", true );
 			AddMenuOption( transform, "Align To View", "visibility", "gameObject.align-to-view", true );
+			transform.AddSeparator();
+			AddMenuOption( transform, "Align Down Local", "vertical_align_bottom", "mesh.align-down-local", true );
+			AddMenuOption( transform, "Align Down World", "vertical_align_bottom", "mesh.align-down-world", true );
+			AddMenuOption( transform, "Align To Closest Normal", "swap_vert", "mesh.align-to-closest-normal", true );
 		}
 
 		if ( hasObjects )
@@ -219,10 +224,17 @@ public sealed partial class ObjectSelection( MeshTool tool ) : SelectionTool
 	{
 		var invBasis = CalculateSelectionBasis().Inverse;
 
-		return BBox.FromPoints( _meshes
+		var points = _objects
 			.Where( x => x.IsValid() )
-			.SelectMany( mc => mc.Mesh.VertexHandles
-				.Select( v => invBasis * mc.WorldTransform.PointToWorld( mc.Mesh.GetVertexPosition( v ) ) ) ) );
+			.SelectMany( go =>
+			{
+				if ( go.GetComponent<MeshComponent>() is { } mc && mc.IsValid() )
+					return mc.Mesh.VertexHandles.Select( v => invBasis * mc.WorldTransform.PointToWorld( mc.Mesh.GetVertexPosition( v ) ) );
+
+				return go.GetBounds().Corners.Select( c => invBasis * c );
+			} );
+
+		return BBox.FromPoints( points );
 	}
 
 	public override Rotation CalculateSelectionBasis()
@@ -406,6 +418,8 @@ public sealed partial class ObjectSelection( MeshTool tool ) : SelectionTool
 
 		foreach ( var go in Scene.GetAllObjects( true ) )
 		{
+			if ( go.Tags.Has( "hidden" ) ) continue;
+
 			var bounds = go.GetBounds();
 			if ( !frustum.IsInside( bounds, !fullyInside ) )
 			{
@@ -524,5 +538,18 @@ public sealed partial class ObjectSelection( MeshTool tool ) : SelectionTool
 		Pivot = box.Center;
 
 		Tool?.MoveMode?.OnBegin( this );
+	}
+
+	public override void AlignDown( bool useLocalDown )
+	{
+		if ( useLocalDown )
+			SceneEditorMenus.AlignToGroundLocal();
+		else
+			SceneEditorMenus.AlignToGround();
+	}
+
+	public override void AlignToClosestNormal()
+	{
+		SceneEditorMenus.AlignToClosestNormal();
 	}
 }

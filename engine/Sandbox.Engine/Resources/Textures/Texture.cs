@@ -28,7 +28,7 @@ public partial class Texture : Resource, IDisposable
 	/// <summary>
 	/// Whether this texture is an error or invalid or not.
 	/// </summary>
-	public bool IsError => native.IsNull || !native.IsStrongHandleValid() || native.IsError();
+	public override bool IsError => native.IsNull || !native.IsStrongHandleValid() || native.IsError();
 
 	public override bool IsValid => native.IsValid;
 
@@ -66,6 +66,9 @@ public partial class Texture : Resource, IDisposable
 	/// </summary>
 	internal void CopyFrom( Texture texture )
 	{
+		if ( !texture.IsValid() )
+			return;
+
 		if ( !native.IsNull )
 		{
 			var n = native;
@@ -189,14 +192,24 @@ public partial class Texture : Resource, IDisposable
 		//
 		// Try to load the texture again, make a new texture
 		//
-		using var newTex = TryToLoad( filesystem, filename, false );
+		var newTex = TryToLoad( filesystem, filename, false );
 
 		//
-		// If success, copy from this texture
+		// FromNative can return this same cached wrapper - nothing to copy.
 		//
-		if ( newTex != null )
+		if ( newTex is null || ReferenceEquals( newTex, this ) )
+			return;
+
+		//
+		// If success, copy from this texture, always releasing the temporary handle.
+		//
+		try
 		{
 			CopyFrom( newTex );
+		}
+		finally
+		{
+			newTex.Dispose();
 		}
 	}
 

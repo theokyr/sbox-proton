@@ -29,6 +29,7 @@ internal class Program
 		AddPullRequestPipeline( rootCommand );
 		AddDeployPipeline( rootCommand );
 		AddUploadCommand( rootCommand );
+		AddUploadReferenceAssembliesCommand( rootCommand );
 
 		rootCommand.Invoke( args );
 		return Environment.ExitCode;
@@ -192,13 +193,19 @@ internal class Program
 			description: "Skip building before running tests (assumes projects are already built)",
 			getDefaultValue: () => false );
 
+		var filterOption = new Option<string>(
+			"--filter",
+			description: "dotnet test filter expression, e.g. TestCategory!=LiveBackend",
+			getDefaultValue: () => null );
+
 		testsCommand.AddOption( noBuildOption );
-		testsCommand.SetHandler( ( bool noBuild ) =>
+		testsCommand.AddOption( filterOption );
+		testsCommand.SetHandler( ( bool noBuild, string filter ) =>
 		{
-			var step = new Test( "Run Tests", noBuild );
+			var step = new Test( "Run Tests", noBuild, filter );
 			ExitCode result = step.Run();
 			Environment.ExitCode = (int)result;
-		}, noBuildOption );
+		}, noBuildOption, filterOption );
 		rootCommand.Add( testsCommand );
 	}
 
@@ -278,6 +285,27 @@ internal class Program
 		{
 			var pipeline = Upload.Create( target );
 			ExitCode result = pipeline.Run();
+			Environment.ExitCode = (int)result;
+		}, targetOption );
+
+		rootCommand.Add( cmd );
+	}
+
+	private static void AddUploadReferenceAssembliesCommand( RootCommand rootCommand )
+	{
+		var cmd = new Command( "upload-reference-assemblies", "Package the managed reference assemblies and upload them to the backend" );
+
+		var targetOption = new Option<BuildTarget>(
+			"--target",
+			description: "Target environment / channel (Staging or Release)",
+			getDefaultValue: () => BuildTarget.Staging );
+
+		cmd.AddOption( targetOption );
+
+		cmd.SetHandler( ( BuildTarget target ) =>
+		{
+			var step = new UploadReferenceAssemblies( "Upload Reference Assemblies", target );
+			ExitCode result = step.Run();
 			Environment.ExitCode = (int)result;
 		}, targetOption );
 

@@ -229,7 +229,7 @@ public static class SceneEditorMenus
 	}
 
 	[Menu( "Editor", "Scene/Transforms/Align Down Local" )]
-	[Shortcut( "gameObject.align-down-local", "CTRL+1" )]
+	[Shortcut( "gameObject.align-down-local", "CTRL+KP_1" )]
 	public static void AlignToGroundLocal()
 	{
 		using var scope = SceneEditorSession.Scope();
@@ -260,7 +260,7 @@ public static class SceneEditorMenus
 	}
 
 	[Menu( "Editor", "Scene/Transforms/Align Down World" )]
-	[Shortcut( "gameObject.align-down-world", "CTRL+2" )]
+	[Shortcut( "gameObject.align-down-world", "CTRL+KP_2" )]
 	public static void AlignToGround()
 	{
 		using var scope = SceneEditorSession.Scope();
@@ -290,7 +290,7 @@ public static class SceneEditorMenus
 	}
 
 	[Menu( "Editor", "Scene/Transforms/Align To Closest Normal" )]
-	[Shortcut( "gameObject.align-to-closest-normal", "CTRL+3" )]
+	[Shortcut( "gameObject.align-to-closest-normal", "CTRL+KP_3" )]
 	public static void AlignToClosestNormal()
 	{
 		using var scope = SceneEditorSession.Scope();
@@ -507,14 +507,15 @@ public static class SceneEditorMenus
 		if ( selected.Length == 0 )
 			return;
 
-		var selectedSet = selected.ToHashSet();
-		var allObjects = SceneEditorSession.Active.Scene
+		var visible = new HashSet<GameObject>();
+		foreach ( var s in selected )
+			for ( var go = s; go is not null and not Scene; go = go.Parent )
+				visible.Add( go );
+
+		var changedObjects = SceneEditorSession.Active.Scene
 			.GetAllObjects( true )
 			.Where( go => go is not Scene )
-			.ToArray();
-
-		var changedObjects = allObjects
-			.Where( go => go.Tags.Has( "hidden" ) == selectedSet.Contains( go ) )
+			.Where( go => go.Tags.Has( "hidden" ) == visible.Contains( go ) )
 			.ToArray();
 		if ( changedObjects.Length == 0 )
 			return;
@@ -523,9 +524,9 @@ public static class SceneEditorMenus
 			.WithGameObjectChanges( changedObjects, GameObjectUndoFlags.All )
 			.Push() )
 		{
-			foreach ( var go in allObjects )
+			foreach ( var go in changedObjects )
 			{
-				if ( selectedSet.Contains( go ) ) go.Tags.Remove( "hidden" );
+				if ( visible.Contains( go ) ) go.Tags.Remove( "hidden" );
 				else go.Tags.Add( "hidden" );
 			}
 		}

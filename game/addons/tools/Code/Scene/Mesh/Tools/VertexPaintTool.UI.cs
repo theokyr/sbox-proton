@@ -56,7 +56,7 @@ partial class VertexPaintTool
 				_channelsWidget.Layout.Spacing = 4;
 
 				var material = tool.Tool.ActiveMaterial;
-				var blendCount = material.IsValid() ? material.GetFeature( "F_MULTIBLEND" ) : 0;
+				var blendCount = GetVertexPaintLayerCount( material );
 
 				var masks = new[]
 				{
@@ -141,7 +141,29 @@ partial class VertexPaintTool
 
 			Layout.AddStretchCell();
 
+			AddShortcuts(
+				("Paint", "LMB"),
+				("Erase", "Ctrl+LMB"),
+				("Sample Color", "Ctrl+RMB"),
+				("Adjust Radius", "Shift+MMB Drag"),
+				("Adjust Strength", "Ctrl+MMB ↕"),
+				("Adjust Hardness", "Ctrl+MMB ↔")
+			);
+
 			UpdateModeVisibility( tool.Mode );
+		}
+
+		static int GetVertexPaintLayerCount( Material material )
+		{
+			if ( !material.IsValid() )
+				return 0;
+
+			if ( material.Flags.GetInt( "VertexPaintUI5Layer" ) == 1 ) return 4;
+			if ( material.Flags.GetInt( "VertexPaintUI4Layer" ) == 1 ) return 3;
+			if ( material.Flags.GetInt( "VertexPaintUI3Layer" ) == 1 ) return 2;
+			if ( material.Flags.GetInt( "VertexPaintUI2Layer" ) == 1 ) return 1;
+
+			return 0;
 		}
 
 		void UpdateModeVisibility( PaintMode mode )
@@ -290,13 +312,18 @@ partial class VertexPaintTool
 				World = world
 			};
 
-			var light = new ScenePointLight( world )
+			var light = new SceneSpotLight( world )
 			{
 				Radius = 4000,
-				LightColor = Color.White * 0.8f,
+				LightColor = Color.White * 0.7f,
 				Position = new Vector3( 0, 0, 100 ),
+				ConeOuter = 89,
+				ConeInner = 75,
+				QuadraticAttenuation = 5f,
 				ShadowsEnabled = true
 			};
+
+			light.Rotation = Rotation.From( 90, 0, 0 );
 
 			var mesh = CreatePlane( new Color( mask.x, mask.y, mask.z, mask.w ) );
 			var model = Model.Builder

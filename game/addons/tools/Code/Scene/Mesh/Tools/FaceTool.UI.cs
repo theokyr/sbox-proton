@@ -19,7 +19,7 @@ partial class FaceTool
 		return new FaceSelectionWidget( GetSerializedSelection(), this );
 	}
 
-	public class FaceSelectionWidget : ToolSidebarWidget
+	public partial class FaceSelectionWidget : ToolSidebarWidget
 	{
 		private readonly MeshFace[] _faces;
 		private readonly List<IGrouping<MeshComponent, MeshFace>> _faceGroups;
@@ -49,6 +49,7 @@ partial class FaceTool
 			SelectByMaterial = EditorCookie.Get( "FaceTool.SelectByMaterial", false );
 			SelectByNormal = EditorCookie.Get( "FaceTool.SelectByNormal", true );
 			NormalThreshold = EditorCookie.Get( "FaceTool.NormalThreshold", 12.0f );
+			LoadTextureSettings();
 
 			if ( _meshTool.CurrentTool is FaceTool ft )
 			{
@@ -63,6 +64,7 @@ partial class FaceTool
 				EditorCookie.Set( "FaceTool.SelectByMaterial", SelectByMaterial );
 				EditorCookie.Set( "FaceTool.SelectByNormal", SelectByNormal );
 				EditorCookie.Set( "FaceTool.NormalThreshold", NormalThreshold );
+				SaveTextureSettings();
 			};
 
 			{
@@ -73,7 +75,7 @@ partial class FaceTool
 			}
 
 			{
-				var group = AddGroup( "Operations" );
+				var group = AddGroup( "Operations", collapsible: true );
 
 				{
 					var row = new Widget { Layout = Layout.Row() };
@@ -101,25 +103,24 @@ partial class FaceTool
 
 					group.Add( row );
 				}
+
+				{
+					var row = new Widget { Layout = Layout.Row() };
+					row.Layout.Spacing = 4;
+
+					CreateButton( "Slice", "grid_4x4", "mesh.quad-slice", QuadSlice, _faces.Length > 0, row.Layout );
+
+					var control = ControlWidget.Create( tool.GetSerialized().GetProperty( nameof( NumCuts ) ) );
+					control.FixedHeight = Theme.ControlHeight;
+					control.ToolTip = "Slice Cuts";
+					row.Layout.Add( control );
+
+					group.Add( row );
+				}
 			}
 
 			{
-				var group = AddGroup( "Slice" );
-
-				var grid = Layout.Row();
-				grid.Spacing = 4;
-
-				var control = ControlWidget.Create( tool.GetSerialized().GetProperty( nameof( NumCuts ) ) );
-				control.FixedHeight = Theme.ControlHeight;
-				grid.Add( control );
-
-				CreateSmallButton( "Slice", "line_axis", "mesh.quad-slice", QuadSlice, _faces.Length > 0, grid );
-
-				group.Add( grid );
-			}
-
-			{
-				var group = AddGroup( "Tools" );
+				var group = AddGroup( "Tools", collapsible: true );
 
 				var grid = Layout.Row();
 				grid.Spacing = 4;
@@ -129,16 +130,19 @@ partial class FaceTool
 				CreateButton( "Mirror Tool", "flip", "mesh.mirror-tool", OpenMirrorTool, _faces.Length > 0, grid );
 				CreateButton( "Clipping Tool", "content_cut", "mesh.open-clipping-tool", OpenClippingTool, _faces.Length > 0, grid );
 				CreateButton( "Bridge", "device_hub", "mesh.bridge-tool", OpenBridgeTool, CanBridgeFaces(), grid );
+				CreateButton( "Inset", "filter_center_focus", "mesh.inset-tool", OpenInsetTool, _faces.Length > 0, grid );
 
 				grid.AddStretchCell();
 
 				group.Add( grid );
 			}
 
+			BuildTextureUI( so, target );
+
 			Layout.AddStretchCell();
 
 			{
-				var group = AddGroup( "Filtered Selection [Alt + Double Click]" );
+				var group = AddGroup( "Filtered Selection [Alt + Double Click]", collapsible: true );
 
 				var normalRow = Layout.Row();
 				normalRow.Spacing = 4;
@@ -172,6 +176,16 @@ partial class FaceTool
 
 				group.Add( normalRow );
 			}
+
+			AddShortcuts(
+				("Lasso Select", "Alt+Shift+Drag"),
+				("Lasso Deselect", "Alt+Ctrl+Drag"),
+				("Grow Selection", "Numpad +"),
+				("Shrink Selection", "Numpad -"),
+				("Apply Material", "Shift+T"),
+				("Wrap Material", "Alt+RMB"),
+				("Lift Material", "Shift+RMB")
+			);
 		}
 
 		bool CanBridgeFaces()
@@ -193,6 +207,17 @@ partial class FaceTool
 				return;
 
 			var tool = new BridgeTool( null, _faces );
+			tool.Manager = _meshTool.Manager;
+			_meshTool.CurrentTool = tool;
+		}
+
+		[Shortcut( "mesh.inset-tool", "Shift+I", typeof( SceneViewWidget ) )]
+		void OpenInsetTool()
+		{
+			if ( _faces.Length == 0 )
+				return;
+
+			var tool = new InsetTool( _faces );
 			tool.Manager = _meshTool.Manager;
 			_meshTool.CurrentTool = tool;
 		}
