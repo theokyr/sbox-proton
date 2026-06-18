@@ -22,7 +22,9 @@ namespace Sandbox.SolutionGenerator
 		/// </summary>
 		private string NormalizePath( string path )
 		{
-			return path.Replace( '\\', '/' );
+			return string.IsNullOrWhiteSpace( path )
+				? path
+				: global::Sandbox.HostPath.Normalize( path ).Replace( '\\', '/' );
 		}
 
 		/// <summary>
