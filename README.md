@@ -20,7 +20,7 @@ This workflow has been tested on Linux with Steam and Proton. You need:
 * Windows .NET Desktop Runtime installed in the editor Wine prefix.
 * `rsync`.
 * `git`.
-* Fallback fonts for editor icons/emoji, such as `NotoColorEmoji` and Material Symbols or Material Icons.
+* Fallback fonts for editor icons/emoji, such as `NotoColorEmoji` and Material Symbols or Material Icons. The Proton titlebar/window-control icons also depend on this staged Material Icons path.
 
 The scripts default to a persistent .NET CLI home under your user directory so the build does not depend on Wine's `Z:/.local` path behavior.
 
@@ -95,6 +95,16 @@ When debugging editor launch or Hammer/resource-compiler failures under Proton, 
 * Prefer Proton-visible native search paths for the resource compiler. Raw Linux paths can be reinterpreted into invalid mixed paths by Windows-side Source 2 code.
 * Keep project-owned `.sbox/cloud` mounted. Compiled cloud package resources, including shader resources referenced by project materials, can live there.
 * Normalize map references before native VPK lookup so `maps/example.vmap` resolves to `example.vpk`, not a doubled `maps/maps/...` path.
+
+## Proton Font/Icon Troubleshooting
+
+Editor and tool UI icons should render through bundled or staged fallback fonts under `game/fonts/`, especially `game/fonts/proton/MaterialIcons-Regular.ttf`. If toolbar or titlebar icons show as boxes, stray letters, or private-use glyphs under Proton, first check whether the control is drawing from a Windows-only font such as Segoe Fluent Icons or Segoe MDL2 Assets. Prefer routing shared editor icon controls through the staged Material Icons path when a matching ligature exists, then rebuild and deploy with:
+
+```bash
+./build-and-deploy.sh --apply
+```
+
+When verifying a deployed UI fix, compare the local and Steam install managed DLLs before assuming Proton is still using the new code.
 
 ## Public Fork Hygiene
 

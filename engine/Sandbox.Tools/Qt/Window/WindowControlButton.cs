@@ -4,17 +4,16 @@ namespace Editor;
 
 internal class WindowControlButton : Widget
 {
-	private static string SymbolFont = GetFont();
-
-	private static string GetFont()
+	internal static string GetMaterialIconName( WindowControlIcon icon )
 	{
-		// On Windows 11 we should be using 'Segoe Fluent Icons', but this isn't available on Windows 10.
-		// Version major and minor are 10.0 in both 10 and 11, confusingly, so we use the build number;
-		// Windows 11 starts at build number 22000, Windows 10 ends at 21390
-		if ( Environment.OSVersion.Version.Build >= 22000 )
-			return "Segoe Fluent Icons";
-
-		return "Segoe MDL2 Assets";
+		return icon switch
+		{
+			WindowControlIcon.Minimize => "remove",
+			WindowControlIcon.Maximize => "crop_square",
+			WindowControlIcon.Restore => "filter_none",
+			WindowControlIcon.Close => "close",
+			_ => "close"
+		};
 	}
 
 	private Action _onClick;
@@ -59,12 +58,11 @@ internal class WindowControlButton : Widget
 		}
 
 		Paint.ClearBrush();
-		Paint.SetFont( SymbolFont, 7.0f );
 		Paint.SetPen( Theme.Text );
 
 		if ( !Enabled )
 			Paint.SetPen( Theme.Text.WithAlpha( 0.5f ) );
 
-		Paint.DrawText( LocalRect, new string( (char)Icon, 1 ) );
+		Paint.DrawIcon( LocalRect, GetMaterialIconName( Icon ), 13.0f );
 	}
 }
