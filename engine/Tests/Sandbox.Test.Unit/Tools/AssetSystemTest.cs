@@ -8,8 +8,8 @@ public class AssetSystemTest
 	[TestMethod]
 	public void GetCloudDatabasePath_NormalizesWineUnixRootPath()
 	{
-		var path = AssetSystem.GetCloudDatabasePath( "S:\\home\\theo\\src\\sbox\\ultraneon" );
+		var path = AssetSystem.GetCloudDatabasePath( "S:\\home\\devuser\\src\\sbox\\proton_test" );
 
-		Assert.AreEqual( "/home/theo/src/sbox/ultraneon/.sbox/cloud.db", path );
+		Assert.AreEqual( "/home/devuser/src/sbox/proton_test/.sbox/cloud.db", path );
 	}
 }

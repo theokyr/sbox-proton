@@ -220,10 +220,10 @@ public class StringExtensionsTest
 	}
 
 	[DataTestMethod]
-	[DataRow( "/home/theo/project/.sbproj", false, "/home/theo/project/.sbproj" )]
-	[DataRow( "Z:\\home\\theo\\project\\.sbproj", true, "/home/theo/project/.sbproj" )]
-	[DataRow( "S:\\home\\theo\\src\\sbox\\ultraneon\\.sbox\\cloud-log.db", true, "/home/theo/src/sbox/ultraneon/.sbox/cloud-log.db" )]
-	[DataRow( "z:/home/theo/.local/share/sbox", true, "/home/theo/.local/share/sbox" )]
+	[DataRow( "/home/devuser/project/.sbproj", false, "/home/devuser/project/.sbproj" )]
+	[DataRow( "Z:\\home\\devuser\\project\\.sbproj", true, "/home/devuser/project/.sbproj" )]
+	[DataRow( "S:\\home\\devuser\\src\\sbox\\proton_test\\.sbox\\cloud-log.db", true, "/home/devuser/src/sbox/proton_test/.sbox/cloud-log.db" )]
+	[DataRow( "z:/home/devuser/.local/share/sbox", true, "/home/devuser/.local/share/sbox" )]
 	[DataRow( "C:\\Users\\steamuser\\Documents\\Game\\.sbproj", true, "C:/Users/steamuser/Documents/Game/.sbproj" )]
 	public void HostPath_Normalize( string input, bool convertWinePaths, string expected )
 	{
@@ -233,19 +233,19 @@ public class StringExtensionsTest
 	[TestMethod]
 	public void HostPath_Normalize_ConvertsSelfIdentifyingWineUnixDrivePath()
 	{
-		var path = System.IO.Path.Combine( "S:\\home\\theo\\src\\sbox\\ultraneon", ".sbox", "cloud.db" );
+		var path = System.IO.Path.Combine( "S:\\home\\devuser\\src\\sbox\\proton_test", ".sbox", "cloud.db" );
 
-		Assert.AreEqual( "/home/theo/src/sbox/ultraneon/.sbox/cloud.db", HostPath.Normalize( path ) );
+		Assert.AreEqual( "/home/devuser/src/sbox/proton_test/.sbox/cloud.db", HostPath.Normalize( path ) );
 	}
 
 	[TestMethod]
 	public void HostPath_TryGetRelativeWithinRoot()
 	{
-		Assert.IsTrue( HostPath.TryGetRelativeWithinRoot( "Z:\\home\\theo\\project\\Assets", "/home/theo/project/Assets/maps/test.vmap", out var relative, true ) );
+		Assert.IsTrue( HostPath.TryGetRelativeWithinRoot( "Z:\\home\\devuser\\project\\Assets", "/home/devuser/project/Assets/maps/test.vmap", out var relative, true ) );
 		Assert.AreEqual( "maps/test.vmap", relative );
 
-		Assert.IsFalse( HostPath.TryGetRelativeWithinRoot( "/home/theo/project/Assets", "/home/theo/other/Assets/test.vtex", out _, true ) );
-		Assert.IsFalse( HostPath.TryGetRelativeWithinRoot( "C:\\Project\\Assets", "Z:\\home\\theo\\project\\Assets\\maps\\test.vmap", out _, true ) );
+		Assert.IsFalse( HostPath.TryGetRelativeWithinRoot( "/home/devuser/project/Assets", "/home/devuser/other/Assets/test.vtex", out _, true ) );
+		Assert.IsFalse( HostPath.TryGetRelativeWithinRoot( "C:\\Project\\Assets", "Z:\\home\\devuser\\project\\Assets\\maps\\test.vmap", out _, true ) );
 	}
 
 	[TestMethod]
@@ -291,9 +291,9 @@ public class StringExtensionsTest
 		{
 			System.IO.Directory.CreateDirectory( System.IO.Path.Combine( prefix, "pfx", "drive_c" ) );
 
-			var paths = HostPath.GetNativeSearchPaths( "/home/theo/src/sbox/ultraneon/Assets", prefix ).ToArray();
+			var paths = HostPath.GetNativeSearchPaths( "/home/devuser/src/sbox/proton_test/Assets", prefix ).ToArray();
 
-			CollectionAssert.AreEqual( new[] { "Z:/home/theo/src/sbox/ultraneon/Assets" }, paths );
+			CollectionAssert.AreEqual( new[] { "Z:/home/devuser/src/sbox/proton_test/Assets" }, paths );
 		}
 		finally
 		{
@@ -314,7 +314,7 @@ public class StringExtensionsTest
 		{
 			System.IO.Directory.CreateDirectory( System.IO.Path.Combine( prefix, "pfx", "drive_c" ) );
 
-			var paths = HostPath.GetNativeSearchPaths( "/home/theo/.local/share/Steam/steamapps/common/sbox/addons/menu/transients", prefix ).ToArray();
+			var paths = HostPath.GetNativeSearchPaths( "/home/steamuser/.local/share/Steam/steamapps/common/sbox/addons/menu/transients", prefix ).ToArray();
 
 			Assert.AreEqual( 0, paths.Length );
 		}
@@ -337,9 +337,9 @@ public class StringExtensionsTest
 		{
 			System.IO.Directory.CreateDirectory( System.IO.Path.Combine( prefix, "pfx", "drive_c" ) );
 
-			var paths = HostPath.GetNativeSearchPaths( "/home/theo/src/sbox/ultraneon/.sbox/cloud", prefix ).ToArray();
+			var paths = HostPath.GetNativeSearchPaths( "/home/devuser/src/sbox/proton_test/.sbox/cloud", prefix ).ToArray();
 
-			CollectionAssert.AreEqual( new[] { "Z:/home/theo/src/sbox/ultraneon/.sbox/cloud" }, paths );
+			CollectionAssert.AreEqual( new[] { "Z:/home/devuser/src/sbox/proton_test/.sbox/cloud" }, paths );
 		}
 		finally
 		{
