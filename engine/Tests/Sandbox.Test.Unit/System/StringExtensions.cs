@@ -351,6 +351,29 @@ public class StringExtensionsTest
 	}
 
 	[TestMethod]
+	public void HostPath_GetManagedFilePath_AddsZFallbackForWineUnixPathWithoutDriveCAlias()
+	{
+		var tempRoot = System.IO.Path.Combine( System.IO.Path.GetTempPath(), $"sbox-hostpath-{Guid.NewGuid():N}" );
+		var prefix = System.IO.Path.Combine( tempRoot, "compatdata", "2129370" );
+
+		try
+		{
+			System.IO.Directory.CreateDirectory( System.IO.Path.Combine( prefix, "pfx", "drive_c" ) );
+
+			var path = HostPath.GetManagedFilePath( "S:\\home\\devuser\\src\\sbox\\proton_test\\.sbox\\cloud.db", prefix );
+
+			Assert.AreEqual( "Z:/home/devuser/src/sbox/proton_test/.sbox/cloud.db", path );
+		}
+		finally
+		{
+			if ( System.IO.Directory.Exists( tempRoot ) )
+			{
+				System.IO.Directory.Delete( tempRoot, true );
+			}
+		}
+	}
+
+	[TestMethod]
 	public void HostPath_GetNativeSearchPaths_UsesDosDeviceAliasForHiddenSteamPath()
 	{
 		var tempRoot = System.IO.Path.Combine( System.IO.Path.GetTempPath(), $"sbox-hostpath-{Guid.NewGuid():N}" );

@@ -51,7 +51,12 @@ public static partial class AssetSystem
 
 	internal static string GetCloudDatabasePath( string rootPath )
 	{
-		return HostPath.Normalize( System.IO.Path.Combine( rootPath, ".sbox", "cloud.db" ), true );
+		return HostPath.GetManagedFilePath( System.IO.Path.Combine( rootPath, ".sbox", "cloud.db" ) );
+	}
+
+	internal static string GetCloudDatabasePath( string rootPath, string winePrefixOrCompatDataPath )
+	{
+		return HostPath.GetManagedFilePath( System.IO.Path.Combine( rootPath, ".sbox", "cloud.db" ), winePrefixOrCompatDataPath );
 	}
 
 	internal static void Shutdown()

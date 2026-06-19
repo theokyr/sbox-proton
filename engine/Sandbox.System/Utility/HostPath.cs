@@ -69,6 +69,35 @@ public static class HostPath
 		return path;
 	}
 
+	public static string GetManagedFilePath( string path )
+	{
+		return GetManagedFilePath( path, GetWinePrefixPath(), IsWineOrProton );
+	}
+
+	internal static string GetManagedFilePath( string path, string winePrefixOrCompatDataPath )
+	{
+		return GetManagedFilePath( path, winePrefixOrCompatDataPath, HasWinePrefix( winePrefixOrCompatDataPath ) );
+	}
+
+	static string GetManagedFilePath( string path, string winePrefixOrCompatDataPath, bool convertWinePaths )
+	{
+		path = Normalize( path, convertWinePaths );
+
+		if ( string.IsNullOrWhiteSpace( path ) || !convertWinePaths )
+			return path;
+
+		if ( IsWineDrivePath( path ) )
+			return path;
+
+		if ( TryGetWineDrivePath( path, winePrefixOrCompatDataPath, out var winePath ) )
+			return winePath;
+
+		if ( IsUnixRootPath( path ) )
+			return $"Z:{path}";
+
+		return path;
+	}
+
 	public static IEnumerable<string> GetNativeSearchPaths( string path )
 	{
 		return GetNativeSearchPaths( path, GetWinePrefixPath() );
