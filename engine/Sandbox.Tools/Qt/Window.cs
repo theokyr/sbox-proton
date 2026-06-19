@@ -120,6 +120,11 @@ namespace Editor
 			NativeInit( _nativeWindow );
 
 			var isMainWindow = this is EditorMainWindow;
+			if ( isMainWindow )
+			{
+				_mainWindow.setWindowFlags( ResolveEditorMainWindowFlags( _mainWindow.windowFlags() ) );
+			}
+
 			var titleBar = new TitleBar( this, isMainWindow );
 			titleBar.SetTitleBarWidgets( _nativeWindow );
 			MenuWidget = titleBar;
@@ -128,6 +133,11 @@ namespace Editor
 			_mainWindow.setAnimated( false );
 
 			SetWindowIcon( "logo_rounded.png" );
+		}
+
+		internal static WindowFlags ResolveEditorMainWindowFlags( WindowFlags flags )
+		{
+			return flags | WindowFlags.Window | WindowFlags.FramelessWindowHint;
 		}
 
 		protected override void OnResize()
