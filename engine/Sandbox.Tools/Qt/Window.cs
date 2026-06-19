@@ -123,12 +123,30 @@ namespace Editor
 
 			var titleBar = new TitleBar( this, isMainWindow );
 			titleBar.SetTitleBarWidgets( _nativeWindow );
+			ApplyProtonFramelessWindowFlags();
 			MenuWidget = titleBar;
 
 			DeleteOnClose = true;
 			_mainWindow.setAnimated( false );
 
 			SetWindowIcon( "logo_rounded.png" );
+		}
+
+		private void ApplyProtonFramelessWindowFlags()
+		{
+			if ( !HostPath.IsWineOrProton )
+				return;
+
+			_mainWindow.setWindowFlags( ResolveProtonFramelessWindowFlags( _mainWindow.windowFlags() ) );
+		}
+
+		internal static WindowFlags ResolveProtonFramelessWindowFlags( WindowFlags flags )
+		{
+			var windowType = flags & WindowFlags.WindowType_Mask;
+			if ( windowType == WindowFlags.Widget )
+				windowType = WindowFlags.Window;
+
+			return windowType | WindowFlags.FramelessWindowHint;
 		}
 
 		protected override void OnResize()
