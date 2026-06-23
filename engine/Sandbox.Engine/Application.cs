@@ -132,7 +132,7 @@ public static class Application
 			var split = text.Split( "\n" );
 
 			Version = split[0].Trim();
-			VersionDate = DateTime.ParseExact( split[4], "dd/MM/yyyy HH:mm:ss", null, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal );
+			VersionDate = DateTime.ParseExact( split[4], "dd/MM/yyyy HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal );
 		}
 	}
 
