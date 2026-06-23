@@ -10,6 +10,8 @@ internal class BuildProton
 		var builder = new PipelineBuilder( "Proton Build" );
 
 		builder.AddStep( new ValidateProtonBuildTarget( "Validate Proton Build Target", targetPlatform, runtimeIdentifier ) );
+		builder.AddStep( new WriteVersion( "Write Version" ) );
+
 		if ( !skipArtifacts )
 		{
 			builder.AddStep( new DownloadPublicArtifacts( "Download Windows Public Artifacts", selection: ArtifactSelection.ProtonWindows ) );
