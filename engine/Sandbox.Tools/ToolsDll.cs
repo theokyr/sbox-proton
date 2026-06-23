@@ -47,6 +47,7 @@ internal class ToolsDll : IToolsDll
 	{
 		EditorEvent.Run( "app.exit" );
 		EditorCookie?.Save();
+		Editor.SboxMcpBridge.Stop();
 		ProjectCookie?.Save();
 	}
 
@@ -187,6 +188,7 @@ internal class ToolsDll : IToolsDll
 	public async Task LoadProject()
 	{
 		await StartupLoadProject.Run();
+		Editor.SboxMcpBridge.Start();
 	}
 
 	/// <summary>
