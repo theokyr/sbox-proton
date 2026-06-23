@@ -20,6 +20,7 @@ Options:
   --help            Show this help.
 
 Synced content:
+  game/.version
   game/*.exe, game/*.dll, game/*.json, game/*.runtimeconfig.json
   focused game/bin/win64 editor, Hammer, and resource compiler artifacts
   game/bin/managed/
@@ -323,6 +324,7 @@ fi
 
 includes=(
 	"*/"
+	"/.version"
 	"/*.exe"
 	"/*.dll"
 	"/*.json"

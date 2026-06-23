@@ -134,12 +134,20 @@ internal static class Utility
 		var versionHash = Environment.GetEnvironmentVariable( "GITHUB_SHA" ) ?? "";
 		versionHash = versionHash[..Math.Min( versionHash.Length, 7 )];
 
-		var versionName = $"{DateTime.Now:yy.MM.dd}-{versionHash}";
+		var versionName = string.IsNullOrWhiteSpace( versionHash )
+			? $"{DateTime.Now:yy.MM.dd}"
+			: $"{DateTime.Now:yy.MM.dd}-{versionHash}";
 
 		// tagged release, prefer tag name
 		if ( Environment.GetEnvironmentVariable( "GITHUB_REF" )?.StartsWith( "refs/tags/" ) == true )
 		{
 			versionName = Environment.GetEnvironmentVariable( "GITHUB_REF_NAME" ) ?? "";
+		}
+
+		const string localBranchSuffix = "-mcp";
+		if ( !versionName.EndsWith( localBranchSuffix, StringComparison.OrdinalIgnoreCase ) )
+		{
+			versionName += localBranchSuffix;
 		}
 
 		return versionName;
