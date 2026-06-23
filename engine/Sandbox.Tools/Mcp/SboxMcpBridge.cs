@@ -482,17 +482,18 @@ internal static class SboxMcpBridge
 			throw new SboxMcpBridgeException( "game_not_running", "No play scene is active" );
 
 		var path = await SboxMcpMainThread.InvokeAsync( ScreenshotService.RequestCapture, TimeSpan.FromSeconds( 5 ) );
+		var absolutePath = ResolveScreenshotPath( path );
 		var deadline = DateTime.UtcNow + TimeSpan.FromSeconds( timeout );
 
 		while ( DateTime.UtcNow < deadline )
 		{
 			ct.ThrowIfCancellationRequested();
-			if ( File.Exists( path ) )
+			if ( File.Exists( absolutePath ) )
 			{
-				var dimensions = TryReadPngDimensions( path );
+				var dimensions = TryReadPngDimensions( absolutePath );
 				return new JsonObject
 				{
-					["path"] = path,
+					["path"] = absolutePath,
 					["width"] = dimensions?.Width,
 					["height"] = dimensions?.Height,
 					["capture_source"] = "screenshot_service",
@@ -505,7 +506,18 @@ internal static class SboxMcpBridge
 			await Task.Delay( 50, ct );
 		}
 
-		throw new SboxMcpBridgeException( "operation_timeout", "Screenshot was requested but no render frame produced a file before timeout", new JsonObject { ["path"] = path } );
+		throw new SboxMcpBridgeException( "operation_timeout", "Screenshot was requested but no render frame produced a file before timeout", new JsonObject { ["path"] = absolutePath } );
+	}
+
+	static string ResolveScreenshotPath( string path )
+	{
+		if ( string.IsNullOrWhiteSpace( path ) ) return path;
+
+		var fullPath = Path.IsPathFullyQualified( path )
+			? path
+			: FileSystem.Root.GetFullPath( path );
+
+		return HostPath.Normalize( fullPath );
 	}
 
 	static JsonObject SceneTree( JsonObject arguments )
