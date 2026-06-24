@@ -24,11 +24,16 @@ namespace Editor;
 internal static class SboxMcpBridge
 {
 	const int MaxConsoleEntries = 5000;
+	const int MaxRequestBytes = 2_000_000;
+	const int MaxAuthProofBytes = 512;
+	const int MaxLookupObjects = 10000;
 	static readonly Logger Log = new( "SboxMcp" );
 	static readonly JsonSerializerOptions CompactJson = new() { WriteIndented = false };
 	static readonly object Sync = new();
 	static readonly object ConsoleSync = new();
 	static readonly List<ConsoleEntry> ConsoleEntries = new( MaxConsoleEntries );
+	static readonly HashSet<ButtonCode> McpPressedKeys = new();
+	static readonly HashSet<ButtonCode> McpPressedMouseButtons = new();
 
 	static TcpListener listener;
 	static CancellationTokenSource cancellation;
@@ -171,9 +176,10 @@ internal static class SboxMcpBridge
 			{
 				client.NoDelay = true;
 				await using var stream = client.GetStream();
-				using var reader = new StreamReader( stream );
 				await using var writer = new StreamWriter( stream ) { AutoFlush = true };
-				var line = await reader.ReadLineAsync( ct );
+				using var readCancellation = CancellationTokenSource.CreateLinkedTokenSource( ct );
+				readCancellation.CancelAfter( TimeSpan.FromSeconds( 5 ) );
+				var line = await ReadBridgeLineAsync( stream, readCancellation.Token );
 
 				var response = await HandleLineAsync( line, ct );
 				await writer.WriteLineAsync( response.ToJsonString( CompactJson ) );
@@ -201,19 +207,22 @@ internal static class SboxMcpBridge
 				return Error( null, "protocol_error", "Bridge request must be a JSON object" );
 
 			requestId = request["id"]?.DeepClone();
-
-			if ( !TokenEquals( GetString( request, "token", null ), token ) )
-				return Error( requestId, "auth_failed", "Invalid bridge token" );
-
 			var operation = GetString( request, "operation", null );
-			if ( string.IsNullOrWhiteSpace( operation ) )
-				return Error( requestId, "invalid_request", "operation is required" );
-
 			var argumentNode = request["arguments"];
 			if ( argumentNode is not null && argumentNode is not JsonObject )
 				return Error( requestId, "invalid_request", "arguments must be a JSON object" );
 
 			var arguments = argumentNode as JsonObject ?? new JsonObject();
+
+			if ( operation == "auth.prove_same_user" )
+				return Ok( requestId, AuthProveSameUser( arguments ) );
+
+			if ( !TokenEquals( GetString( request, "token", null ), token ) )
+				return Error( requestId, "auth_failed", "Invalid bridge token" );
+
+			if ( string.IsNullOrWhiteSpace( operation ) )
+				return Error( requestId, "invalid_request", "operation is required" );
+
 			var result = await DispatchAsync( operation, arguments, ct );
 			return Ok( requestId, result );
 		}
@@ -419,6 +428,8 @@ internal static class SboxMcpBridge
 
 	static JsonObject PlayStop()
 	{
+		ReleaseMcpInputs();
+
 		if ( Game.IsPlaying )
 			EditorScene.Stop();
 
@@ -451,7 +462,7 @@ internal static class SboxMcpBridge
 				SendMouseMove( arguments );
 				break;
 			case "mouse_button":
-				InputRouter.OnMouseButton( ResolveMouseButton( RequiredString( arguments, "button" ) ), RequiredString( arguments, "state" ) == "down", 0 );
+				SendMouseButton( RequiredString( arguments, "button" ), RequiredString( arguments, "state" ) == "down" );
 				break;
 			case "mouse_click":
 				var button = ResolveMouseButton( RequiredString( arguments, "button" ) );
@@ -462,8 +473,7 @@ internal static class SboxMcpBridge
 				InputRouter.OnMouseWheel( (int)GetDouble( arguments, "x", 0 ), (int)GetDouble( arguments, "y", 0 ), 0 );
 				break;
 			case "release_all":
-				InputRouter.OnWindowActive( false );
-				InputRouter.OnWindowActive( true );
+				ReleaseMcpInputs();
 				break;
 			default:
 				throw new SboxMcpBridgeException( "unsupported_input_kind", $"Unsupported input kind: {kind}" );
@@ -698,6 +708,82 @@ internal static class SboxMcpBridge
 		return SelectionGet( arguments );
 	}
 
+	static JsonObject AuthProveSameUser( JsonObject arguments )
+	{
+		var proofPath = RequiredString( arguments, "proof_path" );
+		var nonce = RequiredString( arguments, "nonce" );
+
+		if ( nonce.Length < 32 || nonce.Length > MaxAuthProofBytes )
+			throw new SboxMcpBridgeException( "auth_failed", "Invalid auth proof nonce" );
+
+		if ( !IsAllowedAuthProofPath( proofPath ) )
+			throw new SboxMcpBridgeException( "auth_failed", "Auth proof path is outside the current user's MCP auth directory" );
+
+		var translatedPath = TranslateLinuxPathForHost( proofPath );
+		string proof;
+		try
+		{
+			using var file = new FileStream( translatedPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite );
+			if ( file.Length > MaxAuthProofBytes )
+				throw new SboxMcpBridgeException( "auth_failed", "Auth proof file is too large" );
+
+			using var reader = new StreamReader( file, Encoding.UTF8, false, MaxAuthProofBytes, true );
+			proof = reader.ReadToEnd().Trim();
+		}
+		catch ( SboxMcpBridgeException )
+		{
+			throw;
+		}
+		catch
+		{
+			throw new SboxMcpBridgeException( "auth_failed", "Could not read auth proof file" );
+		}
+
+		if ( !TokenEquals( proof, nonce ) )
+			throw new SboxMcpBridgeException( "auth_failed", "Auth proof did not match" );
+
+		return new JsonObject { ["token"] = token };
+	}
+
+	static bool IsAllowedAuthProofPath( string proofPath )
+	{
+		var uid = CurrentLinuxUid();
+		if ( string.IsNullOrWhiteSpace( uid ) ) return false;
+
+		var normalized = NormalizeLinuxAuthPath( proofPath );
+		if ( string.IsNullOrWhiteSpace( normalized ) ) return false;
+
+		if ( normalized.StartsWith( $"/run/user/{uid}/sbox-mcp/auth/", StringComparison.Ordinal ) )
+			return true;
+
+		var home = CurrentLinuxHome();
+		if ( !string.IsNullOrWhiteSpace( home ) && normalized.StartsWith( $"{home}/.local/share/sbox-mcp/auth/", StringComparison.Ordinal ) )
+			return true;
+
+		return false;
+	}
+
+	static string NormalizeLinuxAuthPath( string path )
+	{
+		if ( string.IsNullOrWhiteSpace( path ) ) return null;
+
+		var normalized = path.Replace( '\\', '/' );
+		if ( normalized.IndexOf( "\0", StringComparison.Ordinal ) >= 0 || !normalized.StartsWith( "/", StringComparison.Ordinal ) ) return null;
+
+		var parts = normalized.Split( '/', StringSplitOptions.RemoveEmptyEntries );
+		if ( parts.Any( x => x is "." or ".." ) ) return null;
+
+		return "/" + string.Join( "/", parts );
+	}
+
+	static string TranslateLinuxPathForHost( string path )
+	{
+		if ( OperatingSystem.IsWindows() && path.StartsWith( "/", StringComparison.Ordinal ) )
+			return "Z:" + path.Replace( '/', '\\' );
+
+		return path;
+	}
+
 	static JsonObject DiagnosticsJson()
 	{
 		var diagnostics = new JsonArray();
@@ -736,12 +822,84 @@ internal static class SboxMcpBridge
 
 	static GameObject ResolveGameObject( Scene scene, Guid id )
 	{
-		return scene.Directory.FindByGuid( id ) ?? throw new SboxMcpBridgeException( "object_not_found", $"GameObject not found: {id}" );
+		return scene.Directory.FindByGuid( id )
+			?? FindGameObjectInTree( scene, id )
+			?? throw new SboxMcpBridgeException( "object_not_found", $"GameObject not found: {id}" );
 	}
 
 	static Component ResolveComponent( Scene scene, Guid id )
 	{
-		return scene.Directory.FindComponentByGuid( id ) ?? throw new SboxMcpBridgeException( "component_not_found", $"Component not found: {id}" );
+		return scene.Directory.FindComponentByGuid( id )
+			?? FindComponentInTree( scene, id )
+			?? throw new SboxMcpBridgeException( "component_not_found", $"Component not found: {id}" );
+	}
+
+	static GameObject FindGameObjectInTree( Scene scene, Guid id )
+	{
+		foreach ( var go in WalkSceneObjects( scene ) )
+		{
+			if ( go.Id == id ) return go;
+		}
+
+		return null;
+	}
+
+	static Component FindComponentInTree( Scene scene, Guid id )
+	{
+		foreach ( var go in WalkSceneObjects( scene ) )
+		{
+			foreach ( var component in go.Components.GetAll() )
+			{
+				if ( component is null || !component.IsValid() || component.GameObject != go || component.Scene != scene ) continue;
+				if ( component.Id == id ) return component;
+			}
+		}
+
+		return null;
+	}
+
+	static IEnumerable<GameObject> WalkSceneObjects( Scene scene )
+	{
+		var stack = new Stack<GameObject>();
+		var seen = new HashSet<Guid>();
+		var scanned = 0;
+
+		for ( var i = scene.Children.Count - 1; i >= 0; i-- )
+		{
+			stack.Push( scene.Children[i] );
+		}
+
+		while ( stack.Count > 0 )
+		{
+			var go = stack.Pop();
+			if ( go is null || !go.IsValid() || go.Scene != scene || !seen.Add( go.Id ) ) continue;
+			if ( ++scanned > MaxLookupObjects ) yield break;
+
+			yield return go;
+
+			for ( var i = go.Children.Count - 1; i >= 0; i-- )
+			{
+				stack.Push( go.Children[i] );
+			}
+		}
+	}
+
+	static async Task<string> ReadBridgeLineAsync( Stream stream, CancellationToken ct )
+	{
+		using var buffer = new MemoryStream();
+		var chunk = new byte[1];
+
+		while ( true )
+		{
+			var read = await stream.ReadAsync( chunk.AsMemory( 0, 1 ), ct );
+			if ( read == 0 ) throw new SboxMcpBridgeException( "protocol_error", "Bridge connection closed before newline" );
+			if ( chunk[0] == '\n' ) break;
+
+			buffer.WriteByte( chunk[0] );
+			if ( buffer.Length > MaxRequestBytes ) throw new SboxMcpBridgeException( "protocol_error", "Bridge request exceeded size limit" );
+		}
+
+		return Encoding.UTF8.GetString( buffer.ToArray() ).TrimEnd( '\r' );
 	}
 
 	static TypeDescription ResolveComponentType( string componentTypeName )
@@ -750,7 +908,7 @@ internal static class SboxMcpBridge
 		if ( type is null && componentTypeName.LastIndexOf( '.' ) is var index && index > 0 && index < componentTypeName.Length - 1 )
 			type = Game.TypeLibrary.GetType<Component>( componentTypeName[(index + 1)..], true );
 
-		if ( type is null || type.TargetType.IsAbstract )
+		if ( type is null || type.TargetType.IsAbstract || type.HasAttribute<HideAttribute>() || type.HasAttribute<ObsoleteAttribute>() )
 			throw new SboxMcpBridgeException( "component_type_not_found", $"Component type not found: {componentTypeName}" );
 
 		return type;
@@ -947,6 +1105,34 @@ internal static class SboxMcpBridge
 	{
 		var code = ResolveKey( key );
 		InputRouter.OnKey( code, code, down, false, 0 );
+
+		if ( down ) McpPressedKeys.Add( code );
+		else McpPressedKeys.Remove( code );
+	}
+
+	static void SendMouseButton( string button, bool down )
+	{
+		var code = ResolveMouseButton( button );
+		InputRouter.OnMouseButton( code, down, 0 );
+
+		if ( down ) McpPressedMouseButtons.Add( code );
+		else McpPressedMouseButtons.Remove( code );
+	}
+
+	static void ReleaseMcpInputs()
+	{
+		foreach ( var key in McpPressedKeys.ToArray() )
+		{
+			InputRouter.OnKey( key, key, false, false, 0 );
+		}
+
+		foreach ( var button in McpPressedMouseButtons.ToArray() )
+		{
+			InputRouter.OnMouseButton( button, false, 0 );
+		}
+
+		McpPressedKeys.Clear();
+		McpPressedMouseButtons.Clear();
 	}
 
 	static ButtonCode ResolveKey( string key )
@@ -1257,7 +1443,7 @@ internal static class SboxMcpBridge
 			["project_title"] = project?.Config?.Title ?? project?.Config?.Ident ?? string.Empty,
 			["host"] = "127.0.0.1",
 			["port"] = port,
-			["token"] = token,
+			["auth"] = "same_user_file",
 			["heartbeat_utc"] = DateTime.UtcNow.ToString( "O" )
 		};
 
@@ -1325,6 +1511,125 @@ internal static class SboxMcpBridge
 		{
 			return Environment.UserName;
 		}
+	}
+
+	static string CurrentLinuxUid()
+	{
+		if ( !OperatingSystem.IsWindows() ) return CurrentUid();
+
+		var runtime = Environment.GetEnvironmentVariable( "XDG_RUNTIME_DIR" );
+		var uid = TryParseUidFromRuntimeDir( runtime );
+		if ( !string.IsNullOrWhiteSpace( uid ) ) return uid;
+
+		try
+		{
+			foreach ( var line in File.ReadLines( @"Z:\proc\self\status" ) )
+			{
+				if ( !line.StartsWith( "Uid:", StringComparison.Ordinal ) ) continue;
+
+				var parts = line.Split( (char[])null, StringSplitOptions.RemoveEmptyEntries );
+				if ( parts.Length >= 2 && uint.TryParse( parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var parsed ) )
+					return parsed.ToString( CultureInfo.InvariantCulture );
+			}
+		}
+		catch
+		{
+		}
+
+		return null;
+	}
+
+	static string CurrentLinuxHome()
+	{
+		var home = NormalizeLinuxHome( Environment.GetEnvironmentVariable( "HOME" ) );
+		if ( !string.IsNullOrWhiteSpace( home ) ) return home;
+
+		home = ReadLinuxHomeFromProcEnviron();
+		if ( !string.IsNullOrWhiteSpace( home ) ) return home;
+
+		home = ReadLinuxHomeFromPasswd( CurrentLinuxUid() );
+		if ( !string.IsNullOrWhiteSpace( home ) ) return home;
+
+		return null;
+	}
+
+	static string ReadLinuxHomeFromProcEnviron()
+	{
+		try
+		{
+			var environ = File.ReadAllText( OperatingSystem.IsWindows() ? @"Z:\proc\self\environ" : "/proc/self/environ" );
+			foreach ( var item in environ.Split( '\0' ) )
+			{
+				if ( !item.StartsWith( "HOME=", StringComparison.Ordinal ) ) continue;
+
+				var home = NormalizeLinuxHome( item[5..] );
+				if ( !string.IsNullOrWhiteSpace( home ) ) return home;
+			}
+		}
+		catch
+		{
+		}
+
+		return null;
+	}
+
+	static string ReadLinuxHomeFromPasswd( string uid )
+	{
+		if ( string.IsNullOrWhiteSpace( uid ) ) return null;
+
+		try
+		{
+			var passwdPath = OperatingSystem.IsWindows() ? @"Z:\etc\passwd" : "/etc/passwd";
+			foreach ( var line in File.ReadLines( passwdPath ) )
+			{
+				if ( string.IsNullOrWhiteSpace( line ) || line.StartsWith( "#", StringComparison.Ordinal ) ) continue;
+
+				var parts = line.Split( ':' );
+				if ( parts.Length < 6 || parts[2] != uid ) continue;
+
+				var home = NormalizeLinuxHome( parts[5] );
+				if ( !string.IsNullOrWhiteSpace( home ) ) return home;
+			}
+		}
+		catch
+		{
+		}
+
+		return null;
+	}
+
+	static string NormalizeLinuxHome( string path )
+	{
+		var normalized = NormalizeLinuxAuthPath( path )?.TrimEnd( '/' );
+		return TryParseHomeFromLinuxPath( normalized ) == normalized ? normalized : null;
+	}
+
+	internal static string TryParseHomeFromLinuxPath( string normalized )
+	{
+		if ( string.IsNullOrWhiteSpace( normalized ) ) return null;
+
+		const string homePrefix = "/home/";
+		if ( !normalized.StartsWith( homePrefix, StringComparison.Ordinal ) ) return null;
+
+		var nextSlash = normalized.IndexOf( '/', homePrefix.Length );
+		if ( nextSlash < 0 ) return normalized.Length > homePrefix.Length ? normalized : null;
+		if ( nextSlash == homePrefix.Length ) return null;
+
+		return normalized[..nextSlash];
+	}
+
+	static string TryParseUidFromRuntimeDir( string path )
+	{
+		if ( string.IsNullOrWhiteSpace( path ) ) return null;
+
+		var normalized = path.Replace( '\\', '/' ).TrimEnd( '/' );
+		const string prefix = "/run/user/";
+		if ( !normalized.StartsWith( prefix, StringComparison.Ordinal ) ) return null;
+
+		var value = normalized[prefix.Length..];
+		return uint.TryParse( value, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed )
+			? parsed.ToString( CultureInfo.InvariantCulture )
+			: null;
 	}
 
 	static void SetUnixMode( string path, UnixFileMode mode )
