@@ -17,13 +17,13 @@ internal enum ArtifactSelection
 	ProtonWindows
 }
 
-internal class DownloadPublicArtifacts( string name, bool nativeBinariesOnly = false, ArtifactSelection selection = ArtifactSelection.All ) : Step( name )
+internal class DownloadPublicArtifacts( bool nativeBinariesOnly = false, ArtifactSelection selection = ArtifactSelection.All )
 {
 	private const string BaseUrl = "https://artifacts.sbox.game";
 	private const int MaxParallelDownloads = 32;
 	private const int MaxDownloadAttempts = 3;
 	private const int MaxManifestLookbackCommits = 128;
-	protected override ExitCode RunInternal()
+	internal ExitCode Run()
 	{
 		try
 		{

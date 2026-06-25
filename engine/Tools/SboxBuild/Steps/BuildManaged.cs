@@ -2,9 +2,9 @@
 
 namespace Facepunch.Steps;
 
-internal class BuildManaged( string name, bool clean = false, string runtimeIdentifier = null ) : Step( name )
+internal class BuildManaged( bool clean = false, string runtimeIdentifier = null )
 {
-	protected override ExitCode RunInternal()
+	internal ExitCode Run()
 	{
 		string engineDir = Path.Combine( Directory.GetCurrentDirectory(), "engine" );
 		string rootDir = Directory.GetCurrentDirectory();
