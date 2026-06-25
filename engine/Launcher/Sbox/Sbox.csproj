@@ -28,8 +28,8 @@
 		<GenerateDependencyFile>false</GenerateDependencyFile>
 		<ReferenceOutputAssembly>false</ReferenceOutputAssembly>
 		<SuppressNETCoreSdkPreviewMessage>true</SuppressNETCoreSdkPreviewMessage>
-		<TieredPGO>true</TieredPGO>
-		<UseWindowsThreadPool>true</UseWindowsThreadPool>
+		<TieredPGO Condition=" '$(SboxRuntimeIdentifier)' == '' ">true</TieredPGO>
+		<UseWindowsThreadPool Condition=" '$(SboxRuntimeIdentifier)' == '' ">true</UseWindowsThreadPool>
 		<CETCompat>false</CETCompat>
 	</PropertyGroup>
 
