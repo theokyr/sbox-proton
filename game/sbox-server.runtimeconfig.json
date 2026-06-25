@@ -8,9 +8,7 @@
     "configProperties": {
       "Sentry.Native.IsEnabled": true,
       "System.Reflection.Metadata.MetadataUpdater.IsSupported": false,
-      "System.Runtime.Serialization.EnableUnsafeBinaryFormatterSerialization": false,
-      "System.Runtime.TieredPGO": true,
-      "System.Threading.ThreadPool.UseWindowsThreadPool": true
+      "System.Runtime.Serialization.EnableUnsafeBinaryFormatterSerialization": false
     }
   }
 }
