@@ -67,6 +67,8 @@ Force a fresh download of public/native artifacts:
 ./build-and-deploy.sh --refresh-artifacts --apply
 ```
 
+Use `--refresh-artifacts` after pulling or merging upstream Facepunch changes, or any time the editor reports an interop hash mismatch between managed and native code. The wrapper can reuse existing `game/bin/win64` artifacts for faster local rebuilds; after upstream moves, stale Source 2/native DLLs can leave freshly built managed assemblies out of sync with the deployed engine.
+
 Preview deployment without copying files:
 
 ```bash
