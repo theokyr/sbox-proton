@@ -190,12 +190,22 @@ remove_obsolete_deployed_files() {
 	local obsolete_files=(
 		"$dest/addons/menu/Code/MenuUI/Components/New/PackageCard.razor"
 	)
+	local obsolete_dirs=(
+		"$dest/addons/menu/code"
+	)
 
 	local obsolete
 	for obsolete in "${obsolete_files[@]}"; do
 		if [[ -f "$obsolete" ]]; then
 			rm -f "$obsolete"
 			echo "Removed obsolete deployed file: $obsolete"
+		fi
+	done
+
+	for obsolete in "${obsolete_dirs[@]}"; do
+		if [[ -d "$obsolete" ]] && ! find "$repo_root/game/addons/menu/code" -type f -print -quit 2>/dev/null | grep -q .; then
+			rm -rf "$obsolete"
+			echo "Removed obsolete deployed directory: $obsolete"
 		fi
 	done
 }
