@@ -210,6 +210,26 @@ remove_obsolete_deployed_files() {
 	done
 }
 
+sync_code_directories() {
+	local sync_args=(-av --delete)
+	if [[ "$apply" -eq 0 ]]; then
+		sync_args+=(--dry-run)
+	fi
+
+	local src_dir rel target_dir
+	while IFS= read -r src_dir; do
+		rel="${src_dir#"$repo_root/game/"}"
+		target_dir="$dest/$rel"
+
+		if [[ "$apply" -eq 1 ]]; then
+			mkdir -p "$target_dir"
+		fi
+
+		echo "Sync code directory: $rel"
+		rsync "${sync_args[@]}" "$src_dir/" "$target_dir/"
+	done < <(find "$repo_root/game/addons" "$repo_root/game/editor" -type d \( -name Code -o -name code \) | sort)
+}
+
 copy_font_if_present() {
 	local source="$1"
 	local target_dir="$2"
@@ -451,3 +471,4 @@ fi
 
 cd "$repo_root"
 rsync "${rsync_args[@]}" "${filter_args[@]}" game/ "$dest/"
+sync_code_directories
