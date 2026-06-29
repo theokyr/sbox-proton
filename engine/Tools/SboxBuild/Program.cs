@@ -59,17 +59,23 @@ internal class Program
 			description: "Skip downloading public Windows/native artifacts; use artifacts already present in game/bin/win64",
 			getDefaultValue: () => false );
 
+		var artifactCommitOption = new Option<string>(
+			"--artifact-commit",
+			description: "Download public Windows/native artifacts from this commit/ref instead of the current checkout",
+			getDefaultValue: () => null );
+
 		buildCommand.AddOption( targetPlatformOption );
 		buildCommand.AddOption( runtimeOption );
 		buildCommand.AddOption( cleanOption );
 		buildCommand.AddOption( skipArtifactsOption );
+		buildCommand.AddOption( artifactCommitOption );
 
-		buildCommand.SetHandler( ( string targetPlatform, string runtime, bool clean, bool skipArtifacts ) =>
+		buildCommand.SetHandler( ( string targetPlatform, string runtime, bool clean, bool skipArtifacts, string artifactCommit ) =>
 		{
-			var pipeline = BuildProton.Create( targetPlatform, runtime, clean, skipArtifacts );
+			var pipeline = BuildProton.Create( targetPlatform, runtime, clean, skipArtifacts, artifactCommit );
 			ExitCode result = pipeline.Run();
 			Environment.ExitCode = (int)result;
-		}, targetPlatformOption, runtimeOption, cleanOption, skipArtifactsOption );
+		}, targetPlatformOption, runtimeOption, cleanOption, skipArtifactsOption, artifactCommitOption );
 
 		rootCommand.Add( buildCommand );
 	}

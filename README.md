@@ -69,6 +69,14 @@ Force a fresh download of public/native artifacts:
 
 Use `--refresh-artifacts` after pulling or merging upstream Facepunch changes, or any time the editor reports an interop hash mismatch between managed and native code. The wrapper can reuse existing `game/bin/win64` artifacts for faster local rebuilds; after upstream moves, stale Source 2/native DLLs can leave freshly built managed assemblies out of sync with the deployed engine.
 
+Pin the native/Source 2 artifacts to an older public commit when a newer Steam/editor build regresses tool behavior:
+
+```bash
+./build-and-deploy.sh --artifact-commit 0a9385a5 --apply
+```
+
+Passing `--artifact-commit` forces an artifact refresh even if `game/bin/win64` already exists. The June 16, 2026 public commit `0a9385a5` is the base for this branch and predates the `24.06.2026` Hammer/resource-compiler regression window.
+
 Preview deployment without copying files:
 
 ```bash

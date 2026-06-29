@@ -17,7 +17,7 @@ internal enum ArtifactSelection
 	ProtonWindows
 }
 
-internal class DownloadPublicArtifacts( string name, bool nativeBinariesOnly = false, ArtifactSelection selection = ArtifactSelection.All ) : Step( name )
+internal class DownloadPublicArtifacts( string name, bool nativeBinariesOnly = false, ArtifactSelection selection = ArtifactSelection.All, string artifactCommit = null ) : Step( name )
 {
 	private const string BaseUrl = "https://artifacts.sbox.game";
 	private const int MaxParallelDownloads = 32;
@@ -31,16 +31,21 @@ internal class DownloadPublicArtifacts( string name, bool nativeBinariesOnly = f
 			// matching manifest. Fetch only the current PR branch to avoid pulling down
 			// every branch and tag from the remote.
 			var headRef = Environment.GetEnvironmentVariable( "GITHUB_HEAD_REF" );
-			if ( !string.IsNullOrEmpty( headRef ) )
+			if ( string.IsNullOrWhiteSpace( artifactCommit ) && !string.IsNullOrEmpty( headRef ) )
 			{
 				Utility.RunProcess( "git", $"fetch --deepen={MaxManifestLookbackCommits} --no-tags origin {headRef}" );
 			}
 
-			var commitCandidates = ResolveCommitHistory( MaxManifestLookbackCommits );
+			var commitCandidates = ResolveCommitCandidates( artifactCommit, MaxManifestLookbackCommits );
 			if ( commitCandidates.Count == 0 )
 			{
 				Log.Error( "Unable to determine the commit hash to download artifacts for." );
 				return ExitCode.Failure;
+			}
+
+			if ( !string.IsNullOrWhiteSpace( artifactCommit ) )
+			{
+				Log.Info( $"Pinned public artifact commit: {commitCandidates[0]}" );
 			}
 
 			using var httpClient = CreateHttpClient();
@@ -206,6 +211,65 @@ internal class DownloadPublicArtifacts( string name, bool nativeBinariesOnly = f
 		{
 			Timeout = TimeSpan.FromMinutes( 5 )
 		};
+	}
+
+	private static IReadOnlyList<string> ResolveCommitCandidates( string artifactCommit, int maxCommits )
+	{
+		if ( string.IsNullOrWhiteSpace( artifactCommit ) )
+		{
+			return ResolveCommitHistory( maxCommits );
+		}
+
+		var resolvedCommit = ResolveCommit( artifactCommit.Trim() );
+		if ( string.IsNullOrWhiteSpace( resolvedCommit ) )
+		{
+			return Array.Empty<string>();
+		}
+
+		return new[] { resolvedCommit };
+	}
+
+	private static string ResolveCommit( string artifactCommit )
+	{
+		if ( IsFullCommitHash( artifactCommit ) )
+		{
+			return artifactCommit.ToLowerInvariant();
+		}
+
+		var commits = new List<string>( 1 );
+		var success = Utility.RunProcess( "git", $"rev-parse --verify {artifactCommit}^{{commit}}", onDataReceived: ( _, e ) =>
+		{
+			if ( !string.IsNullOrWhiteSpace( e.Data ) )
+			{
+				commits.Add( e.Data.Trim() );
+			}
+		} );
+
+		if ( success && commits.Count > 0 )
+		{
+			return commits[0];
+		}
+
+		Log.Error( $"Unable to resolve public artifact commit/ref '{artifactCommit}'." );
+		return null;
+	}
+
+	private static bool IsFullCommitHash( string value )
+	{
+		if ( value.Length != 40 )
+		{
+			return false;
+		}
+
+		foreach ( var ch in value )
+		{
+			if ( !Uri.IsHexDigit( ch ) )
+			{
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	private static IReadOnlyList<string> ResolveCommitHistory( int maxCommits )

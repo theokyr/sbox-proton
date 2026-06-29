@@ -5,7 +5,7 @@ namespace Facepunch.Pipelines;
 
 internal class BuildProton
 {
-	public static Pipeline Create( string targetPlatform, string runtimeIdentifier, bool clean = false, bool skipArtifacts = false )
+	public static Pipeline Create( string targetPlatform, string runtimeIdentifier, bool clean = false, bool skipArtifacts = false, string artifactCommit = null )
 	{
 		var builder = new PipelineBuilder( "Proton Build" );
 
@@ -14,7 +14,7 @@ internal class BuildProton
 
 		if ( !skipArtifacts )
 		{
-			builder.AddStep( new DownloadPublicArtifacts( "Download Windows Public Artifacts", selection: ArtifactSelection.ProtonWindows ) );
+			builder.AddStep( new DownloadPublicArtifacts( "Download Windows Public Artifacts", selection: ArtifactSelection.ProtonWindows, artifactCommit: artifactCommit ) );
 		}
 
 		builder.AddStep( new Steps.InteropGen( "Interop Gen", skipNative: true ) );

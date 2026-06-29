@@ -4,6 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 dotnet_home="${DOTNET_CLI_HOME:-$HOME/.local/share/sbox-public/dotnet-cli-home}"
 refresh_artifacts=0
+artifact_commit="${SBOX_PUBLIC_ARTIFACT_COMMIT:-}"
 deploy_args=()
 
 while [[ $# -gt 0 ]]; do
@@ -11,6 +12,10 @@ while [[ $# -gt 0 ]]; do
 		--refresh-artifacts)
 			refresh_artifacts=1
 			shift
+			;;
+		--artifact-commit)
+			artifact_commit="${2:-}"
+			shift 2
 			;;
 		*)
 			deploy_args+=("$1")
@@ -27,7 +32,11 @@ export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
 cd "$repo_root"
 
 build_args=( build-proton --target-platform win64 --runtime win-x64 )
-if [[ "$refresh_artifacts" -eq 0 && -f "$repo_root/game/bin/win64/engine2.dll" && -f "$repo_root/game/bin/win64/resourcecompiler.dll" ]]; then
+if [[ -n "$artifact_commit" ]]; then
+	build_args+=( --artifact-commit "$artifact_commit" )
+fi
+
+if [[ "$refresh_artifacts" -eq 0 && -z "$artifact_commit" && -f "$repo_root/game/bin/win64/engine2.dll" && -f "$repo_root/game/bin/win64/resourcecompiler.dll" ]]; then
 	build_args+=( --skip-artifacts )
 fi
 
